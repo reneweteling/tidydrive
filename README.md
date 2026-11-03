@@ -14,7 +14,7 @@ https://github.com/reneweteling/tidydrive/raw/main/docs/public/assets/demo.mp4
 
 ![Swift 5.9](https://img.shields.io/badge/Swift-5.9-orange?logo=swift) ![macOS 14+](https://img.shields.io/badge/macOS-14%2B-blue?logo=apple)
 
-A menu bar app for developers. It watches your disk, warns you once when it passes 90%, and shows what your tools left behind. You pick what goes.
+A menu bar app for developers, by [René Weteling](https://www.weteling.com). It watches your disk, warns you once when it passes 90%, and shows what your tools left behind. You pick what goes.
 
 Website: https://reneweteling.github.io/tidydrive/
 
@@ -85,6 +85,16 @@ Crash reports go to Sentry with the app version and category names. No file name
 | `swift scripts/make-demo.swift build/assets docs/public/assets/demo.mp4` | Builds the demo video (needs ffmpeg) |
 
 Releases run on every push to `main`: semantic-release picks the version from Conventional Commits, the macOS job tests, builds, signs, notarizes and attaches `TidyDrive.zip` to the GitHub release. The site in `docs/` deploys to GitHub Pages.
+
+## Made by
+
+<img src="docs/public/assets/rene.jpg" alt="René Weteling" width="96" align="left" style="border-radius:12px; margin-right:16px">
+
+**René Weteling**, agentic developer. I orchestrate AI agents that design, code, test and ship. TidyDrive went from a sketch to a signed, notarized release in a single day.
+
+Need that on your own product? Start a project at [weteling.com](https://www.weteling.com). Also by me: [Loft](https://reneweteling.github.io/loft-app/), drag a file to your menu bar and get a link back.
+
+<br clear="left">
 
 ## License
 

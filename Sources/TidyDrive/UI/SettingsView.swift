@@ -107,6 +107,12 @@ struct SettingsView: View {
             }
             .font(.system(size: 12))
             Spacer()
+            VStack(spacing: 4) {
+                Text("Made by René Weteling, agentic developer").font(.system(size: 12, weight: .medium))
+                Link("weteling.com: start a project", destination: URL(string: "https://www.weteling.com")!)
+                    .font(.system(size: 12, weight: .semibold))
+                    .tint(Theme.accent)
+            }
             Text("© 2026 Felobo B.V. · PolyForm Noncommercial 1.0.0").font(.caption).foregroundStyle(.secondary)
                 .padding(.bottom, 14)
         }

@@ -9,7 +9,7 @@ const githubUrl = 'https://github.com/reneweteling/tidydrive';
   <div class="wrap">
     <div class="topline">
       <span class="brand"><img src={asset('assets/icon.png')} alt="" width="28" height="28" onerror="this.style.display='none'" />TidyDrive</span>
-      <span class="mono meta">macOS 14+ / Apple Silicon</span>
+      <span class="mono meta">macOS 14+ / Apple Silicon / by <a href="https://www.weteling.com" target="_blank" rel="noopener">René Weteling</a></span>
     </div>
 
     <div class="grid">
@@ -100,6 +100,8 @@ const githubUrl = 'https://github.com/reneweteling/tidydrive';
   .hero { background: var(--hero-bg); color: var(--hero-ink); padding: 28px 0 80px; position: relative; overflow: hidden; }
   .hero::before { content: ""; position: absolute; inset: 0; background-image: linear-gradient(var(--hero-line) 1px, transparent 1px), linear-gradient(90deg, var(--hero-line) 1px, transparent 1px); background-size: 48px 48px; opacity: .35; mask-image: linear-gradient(#000, transparent 85%); -webkit-mask-image: linear-gradient(#000, transparent 85%); }
   .hero .wrap { position: relative; }
+  .meta a { color: var(--hero-accent); text-decoration: none; }
+  .meta a:hover { text-decoration: underline; }
   .topline { display: flex; justify-content: space-between; align-items: center; padding-bottom: 56px; }
   .brand { display: flex; align-items: center; gap: 10px; font: 800 22px/1 var(--display); letter-spacing: -0.01em; text-transform: uppercase; }
   .brand img { border-radius: 7px; }
