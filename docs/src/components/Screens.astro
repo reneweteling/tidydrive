@@ -1,0 +1,42 @@
+---
+const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
+const asset = (p: string) => `${base}${p.replace(/^\//, '')}`;
+---
+<section class="block" id="screens">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="kicker">Three screens</span>
+      <h2>Glance. Review. Clean.</h2>
+      <p class="sub">That is the whole app.</p>
+    </div>
+
+    <div class="screens">
+      <figure class="s-pop">
+        <div class="shot pop" data-label="popover.png"><img src={asset('assets/popover.png')} alt="TidyDrive popover with disk gauge and categories" width="360" height="545" loading="lazy" onerror="this.style.visibility='hidden'" /></div>
+        <figcaption><b>01 Popover</b>Click the menu bar icon. Disk gauge, what can go per category, one Clean button. The icon shows the percentage once you pass 90%.</figcaption>
+      </figure>
+      <div class="right">
+        <figure>
+          <div class="shot rev" data-label="review.png"><img src={asset('assets/review.png')} alt="TidyDrive review window with categories and items" width="980" height="620" loading="lazy" onerror="this.style.visibility='hidden'" /></div>
+          <figcaption><b>02 Review window</b>Categories left. Every item shows what it is, why it can go and how big it is. Click to reveal in Finder.</figcaption>
+        </figure>
+        <figure>
+          <div class="shot note" data-label="notification.png"><img src={asset('assets/notification.png')} alt="TidyDrive notification: your disk is 90% full" width="400" height="86" loading="lazy" onerror="this.style.visibility='hidden'" /></div>
+          <figcaption><b>03 Notification</b>One alert when the disk passes 90%. It re-arms below 85%, so you never get the same warning every five minutes.</figcaption>
+        </figure>
+      </div>
+    </div>
+  </div>
+</section>
+<style>
+  .screens { display: grid; grid-template-columns: minmax(0, 360px) 1fr; gap: 48px; align-items: start; }
+  figure { margin: 0; }
+  .right { display: grid; gap: 40px; }
+  .pop { aspect-ratio: 360 / 545; }
+  .rev { aspect-ratio: 980 / 620; }
+  .note { aspect-ratio: 400 / 86; max-width: 400px; }
+  .shot { box-shadow: 0 30px 60px -30px rgba(13,21,23,.35); }
+  figcaption { margin-top: 16px; color: var(--muted); max-width: 52ch; }
+  figcaption b { display: block; font: 700 13px/1 var(--mono); color: var(--ink); margin-bottom: 8px; text-transform: uppercase; letter-spacing: .06em; }
+  @media (max-width: 820px) { .screens { grid-template-columns: 1fr; } .pop { max-width: 360px; } }
+</style>

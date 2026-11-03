@@ -1,0 +1,41 @@
+---
+const dl = 'https://github.com/reneweteling/tidydrive/releases/latest';
+---
+<section class="block alt" id="install">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="kicker">Install</span>
+      <h2>Two minutes.</h2>
+      <p class="sub">Needs macOS 14 or newer on Apple Silicon.</p>
+    </div>
+    <div class="cols">
+      <ol>
+        <li><span>1</span><div><b>Download</b><p><a href={dl}>TidyDrive.zip</a> from the latest release.</p></div></li>
+        <li><span>2</span><div><b>Move to Applications</b><p>Unzip and drag TidyDrive.app into /Applications.</p></div></li>
+        <li><span>3</span><div><b>Open it</b><p>It is signed and notarized, so it opens normally. Allow notifications when asked.</p></div></li>
+        <li><span>4</span><div><b>Pick your project folder</b><p>In Settings, point TidyDrive at where your projects live.</p></div></li>
+      </ol>
+      <div class="src">
+        <span class="mono lab">Or build from source</span>
+        <pre><code><span class="p">$</span> git clone https://github.com/reneweteling/tidydrive.git
+<span class="p">$</span> cd tidydrive
+<span class="p">$</span> ./scripts/build.sh
+<span class="p">$</span> cp -R build/TidyDrive.app /Applications/</code></pre>
+      </div>
+    </div>
+  </div>
+</section>
+<style>
+  .alt { background: var(--surface); border-block: 1px solid var(--line); }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: start; }
+  ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 22px; }
+  li { display: grid; grid-template-columns: 44px 1fr; gap: 16px; }
+  li span { width: 44px; height: 44px; border-radius: 10px; background: var(--accent); color: var(--accent-ink); display: grid; place-items: center; font: 800 1.5rem/1 var(--display); }
+  li b { font: 800 1.35rem/1.1 var(--display); text-transform: uppercase; display: block; margin-bottom: 4px; }
+  li p { color: var(--muted); }
+  li a { color: var(--accent); font-weight: 600; }
+  .lab { display: block; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .1em; margin-bottom: 12px; }
+  pre { margin: 0; background: var(--hero-bg); color: var(--hero-ink); border-radius: 14px; padding: 22px 24px; overflow-x: auto; font: 14px/1.9 var(--mono); }
+  .p { color: var(--hero-accent); user-select: none; }
+  @media (max-width: 820px) { .cols { grid-template-columns: 1fr; gap: 36px; } }
+</style>

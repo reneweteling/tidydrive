@@ -1,0 +1,60 @@
+---
+const rows: [string, string, string, 'safe' | 'rebuild' | 'careful', string][] = [
+  ['Xcode', 'DerivedData, DeviceSupport, archives, old Xcode apps', 'rm, apps to Trash', 'safe', 'Archives and apps: careful'],
+  ['Simulators', 'Unavailable devices, old runtimes', 'simctl', 'rebuild', ''],
+  ['Projects', 'node_modules, Rust target, Elixir _build and deps, .venv, Pods, .gradle and more, for 20+ ecosystems', 'rm', 'rebuild', ''],
+  ['Large files', 'Files over 500 MB in your project folders', 'Trash', 'careful', ''],
+  ['Package caches', 'npm, pnpm, uv, Go, Cargo, Homebrew, Playwright, editor caches and about 30 more', "Tool's own clean command", 'safe', ''],
+  ['ML models', 'Ollama, Hugging Face', "Tool's own remove command", 'careful', ''],
+  ['Language versions', 'asdf, mise, nvm, fnm, volta, rbenv, pyenv, uv, rustup, sdkman, fvm, tfenv', "Manager's uninstall", 'careful', ''],
+  ['Docker', 'Images and volumes per compose project, dangling images, build cache', 'docker rmi, rm, prune', 'rebuild', 'Volumes: careful'],
+  ['Android', 'AVDs, SDK cache, old build-tools and system images', 'rm', 'rebuild', ''],
+];
+const label = { safe: 'Safe', rebuild: 'Rebuild', careful: 'Careful' };
+---
+<section class="block alt" id="cleans">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="kicker">What it cleans</span>
+      <h2>Nine places<br />your disk went.</h2>
+    </div>
+
+    <div class="legend">
+      <div><span class="pill safe">Safe</span><p>A cache the tool rebuilds itself.</p></div>
+      <div><span class="pill rebuild">Rebuild</span><p>Comes back with an install or build. Costs time, not data.</p></div>
+      <div><span class="pill careful">Careful</span><p>May be data. Never selected by default.</p></div>
+    </div>
+
+    <div class="tw">
+      <table>
+        <thead><tr><th>Category</th><th>What</th><th>Removed with</th><th>Risk</th></tr></thead>
+        <tbody>
+          {rows.map(([c, w, h, r, note]) => (
+            <tr>
+              <th scope="row">{c}</th>
+              <td>{w}</td>
+              <td class="mono">{h}</td>
+              <td><span class={`pill ${r}`}>{label[r]}</span>{note && <small>{note}</small>}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+<style>
+  .alt { background: var(--surface); border-block: 1px solid var(--line); }
+  .legend { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px; margin-bottom: 32px; }
+  .legend div { border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: grid; gap: 10px; justify-items: start; background: var(--bg); }
+  .legend p { color: var(--muted); font-size: 15px; }
+  .tw { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; }
+  table { border-collapse: collapse; width: 100%; min-width: 680px; font-size: 15px; }
+  th, td { text-align: left; padding: 16px 18px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tbody tr:last-child > * { border-bottom: 0; }
+  thead th { font: 600 11px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); background: var(--bg); }
+  tbody th { font: 800 1.3rem/1.1 var(--display); text-transform: uppercase; white-space: nowrap; }
+  td { color: var(--muted); }
+  td.mono { font-size: 13px; }
+  small { display: block; margin-top: 6px; color: var(--muted); font-size: 12px; }
+  tbody tr:hover { background: color-mix(in srgb, var(--accent) 5%, transparent); }
+</style>

@@ -1,0 +1,48 @@
+---
+import '../styles/global.css';
+import Hero from '../components/Hero.astro';
+import Stats from '../components/Stats.astro';
+import Screens from '../components/Screens.astro';
+import Cleans from '../components/Cleans.astro';
+import Decides from '../components/Decides.astro';
+import Steps from '../components/Steps.astro';
+import Faq from '../components/Faq.astro';
+import Footer from '../components/Footer.astro';
+
+const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
+const title = 'TidyDrive: free your disk from developer clutter';
+const description = 'TidyDrive is a macOS menu bar app that watches your disk and shows what can go: Xcode, simulators, build output, package caches, old language versions and Docker.';
+const canonical = 'https://reneweteling.github.io/tidydrive/';
+const ogImage = 'https://reneweteling.github.io/tidydrive/assets/review.png';
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    <meta name="theme-color" content="#0d1517" />
+    <meta property="og:title" content="TidyDrive" />
+    <meta property="og:description" content="Your disk is full. Take it back." />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="TidyDrive" />
+    <meta name="twitter:description" content="Your disk is full. Take it back." />
+    <meta name="twitter:image" content={ogImage} />
+    <link rel="icon" type="image/svg+xml" href={`${base}favicon.svg`} />
+  </head>
+  <body>
+    <Hero />
+    <Stats />
+    <Screens />
+    <Cleans />
+    <Decides />
+    <Steps />
+    <Faq />
+    <Footer />
+  </body>
+</html>

@@ -1,0 +1,140 @@
+---
+const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
+const asset = (p: string) => `${base}${p.replace(/^\//, '')}`;
+const downloadUrl = 'https://github.com/reneweteling/tidydrive/releases/latest';
+const githubUrl = 'https://github.com/reneweteling/tidydrive';
+---
+
+<header class="hero">
+  <div class="wrap">
+    <div class="topline">
+      <span class="brand"><img src={asset('assets/icon.png')} alt="" width="28" height="28" onerror="this.style.display='none'" />TidyDrive</span>
+      <span class="mono meta">macOS 14+ / Apple Silicon</span>
+    </div>
+
+    <div class="grid">
+      <div class="copy">
+        <span class="kicker">Menu bar app for developers</span>
+        <h1>Your disk is <em>full.</em><br />Take it back.</h1>
+        <p class="pitch">
+          TidyDrive watches your disk and shows what can go: Xcode, simulators, build output, package caches, old language versions and Docker.
+        </p>
+        <div class="cta">
+          <a class="btn primary" href={downloadUrl}>
+            <svg width="18" height="18" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 2v8m0 0L5 7m3 3 3-3M2 13h12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+            Download for macOS
+          </a>
+          <a class="btn ghost" href={githubUrl} target="_blank" rel="noopener">Source on GitHub</a>
+        </div>
+        <p class="mono fine">Signed and notarized. Free for noncommercial use.</p>
+      </div>
+
+      <div class="gauge" id="gauge" aria-label="Animated example: disk usage dropping after a cleanup">
+        <div class="g-head mono"><span>Macintosh HD</span><span id="g-label">461 / 500 GB</span></div>
+        <div class="pct"><span id="g-pct">92</span><small>%</small></div>
+        <div class="track">
+          <div class="fill" id="g-fill" style="width:92%"></div>
+          <i class="mark" style="left:90%"><b>90 alert</b></i>
+          <i class="mark m2" style="left:85%"><b>85 re-arm</b></i>
+        </div>
+        <div class="g-foot">
+          <div><span class="mono lab">Can be removed</span><strong id="g-found">84.6 GB</strong></div>
+          <div class="freed" id="g-freed-wrap"><span class="mono lab">Freed</span><strong id="g-freed">0 GB</strong></div>
+        </div>
+      </div>
+    </div>
+
+    <figure class="video">
+      <div class="vbox shot" data-label="demo.mp4 goes here">
+        <video autoplay muted loop playsinline preload="metadata" poster={asset('assets/demo-poster.png')}>
+          <source src={asset('assets/demo.mp4')} type="video/mp4" />
+        </video>
+      </div>
+    </figure>
+  </div>
+</header>
+
+<script>
+  const $ = (id: string) => document.getElementById(id)!;
+  const fill = $('g-fill'), pct = $('g-pct'), label = $('g-label'), freed = $('g-freed'), found = $('g-found'), wrap = $('g-freed-wrap');
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const TOTAL = 500;
+  const set = (used: number) => {
+    fill.style.width = (used / TOTAL) * 100 + '%';
+    pct.textContent = String(Math.round((used / TOTAL) * 100));
+    label.textContent = `${Math.round(used)} / ${TOTAL} GB`;
+    fill.classList.toggle('ok', used / TOTAL < 0.85);
+  };
+  const tween = (from: number, to: number, ms: number, fn: (v: number) => void) =>
+    new Promise<void>((res) => {
+      const t0 = performance.now();
+      const step = (t: number) => {
+        const k = Math.min(1, (t - t0) / ms);
+        const e = 1 - Math.pow(1 - k, 3);
+        fn(from + (to - from) * e);
+        k < 1 ? requestAnimationFrame(step) : res();
+      };
+      requestAnimationFrame(step);
+    });
+  const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+  if (!reduce) {
+    fill.style.transition = 'none';
+    (async () => {
+      while (true) {
+        wrap.classList.remove('on');
+        freed.textContent = '0 GB';
+        found.textContent = '84.6 GB';
+        await tween(300, 461, 1400, set);
+        await wait(1800);
+        wrap.classList.add('on');
+        const from = 461, to = 461 - 62.1;
+        await tween(0, 62.1, 2200, (v) => { freed.textContent = v.toFixed(1) + ' GB'; set(from - v); });
+        found.textContent = '22.5 GB';
+        await wait(3200);
+      }
+    })();
+  }
+</script>
+
+<style>
+  .hero { background: var(--hero-bg); color: var(--hero-ink); padding: 28px 0 80px; position: relative; overflow: hidden; }
+  .hero::before { content: ""; position: absolute; inset: 0; background-image: linear-gradient(var(--hero-line) 1px, transparent 1px), linear-gradient(90deg, var(--hero-line) 1px, transparent 1px); background-size: 48px 48px; opacity: .35; mask-image: linear-gradient(#000, transparent 85%); -webkit-mask-image: linear-gradient(#000, transparent 85%); }
+  .hero .wrap { position: relative; }
+  .topline { display: flex; justify-content: space-between; align-items: center; padding-bottom: 56px; }
+  .brand { display: flex; align-items: center; gap: 10px; font: 800 22px/1 var(--display); letter-spacing: -0.01em; text-transform: uppercase; }
+  .brand img { border-radius: 7px; }
+  .meta { color: var(--hero-muted); font-size: 12px; }
+  .grid { display: grid; grid-template-columns: 1.25fr 1fr; gap: 56px; align-items: center; }
+  .kicker { color: var(--hero-accent); }
+  h1 { font-size: clamp(3.4rem, 9.5vw, 7.6rem); text-transform: uppercase; line-height: .9; }
+  h1 em { font-style: normal; color: var(--hero-accent); }
+  .pitch { color: var(--hero-muted); font-size: 1.25rem; max-width: 44ch; margin-top: 28px; }
+  .cta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 32px; }
+  .fine { margin-top: 18px; color: var(--hero-muted); font-size: 12px; }
+
+  .gauge { background: color-mix(in srgb, var(--hero-bg) 70%, #1b2b2e); border: 1px solid var(--hero-line); border-radius: 20px; padding: 26px; box-shadow: 0 40px 80px -30px rgba(0,0,0,.7); }
+  .g-head { display: flex; justify-content: space-between; color: var(--hero-muted); font-size: 12px; }
+  .pct { font: 800 clamp(5rem, 12vw, 8rem)/1 var(--display); letter-spacing: -0.04em; margin: 8px 0 14px; font-variant-numeric: tabular-nums; }
+  .pct small { font-size: .4em; color: var(--hero-accent); margin-left: 4px; }
+  .track { position: relative; height: 22px; border-radius: 6px; background: var(--hero-line); margin-bottom: 34px; }
+  .fill { height: 100%; border-radius: 6px; background: var(--hero-accent); transition: width .6s; }
+  .fill.ok { background: #5fd39a; }
+  .mark { position: absolute; top: -6px; bottom: -6px; width: 2px; background: var(--hero-ink); opacity: .8; }
+  .mark b { position: absolute; bottom: 100%; margin-bottom: 5px; right: -2px; font: 600 10px/1 var(--mono); white-space: nowrap; color: var(--hero-muted); }
+  .mark.m2 { opacity: .45; }
+  .mark.m2 b { bottom: auto; top: 100%; margin: 5px 0 0; right: -2px; }
+  .g-foot { display: flex; justify-content: space-between; gap: 16px; }
+  .lab { display: block; font-size: 11px; color: var(--hero-muted); text-transform: uppercase; letter-spacing: .08em; }
+  .g-foot strong { font: 800 2rem/1.1 var(--display); font-variant-numeric: tabular-nums; }
+  .freed { opacity: .35; transition: opacity .3s; text-align: right; }
+  .freed.on { opacity: 1; }
+  .freed.on strong { color: #5fd39a; }
+
+  .video { margin: 72px 0 0; }
+  .vbox { aspect-ratio: 16 / 10; border-radius: 18px; border-color: var(--hero-line); background-color: #0b1214; box-shadow: 0 50px 100px -40px rgba(0,0,0,.8), 0 0 0 1px var(--hero-line); }
+  .vbox::before { color: var(--hero-muted); }
+  .vbox video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: transparent; }
+
+  @media (max-width: 860px) { .grid { grid-template-columns: 1fr; gap: 40px; } .topline { padding-bottom: 36px; } }
+  @media (max-width: 480px) { .gauge { padding: 18px; } .video { margin-top: 48px; } }
+</style>

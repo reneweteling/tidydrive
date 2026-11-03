@@ -1,0 +1,44 @@
+---
+const rules = [
+  ['Marker file', 'A folder only counts when its marker sits next to it.', 'target/ beside Cargo.toml is Rust output. A lone target/ stays.'],
+  ['Stale after 60 days', 'Only stale projects are selected for you.', 'Uncommitted changes: never stale.'],
+  ['Newest version stays', 'The newest version of each language is always kept.', 'Older ones go only if no version file in your projects points at them.'],
+  ['Delete or Trash', 'Regenerable things are deleted directly.', 'Large files and Xcode apps go to the Trash.'],
+];
+---
+<section class="block" id="decides">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="kicker">How it decides</span>
+      <h2>Four rules.<br />No guessing.</h2>
+    </div>
+    <div class="cards">
+      {rules.map(([t, a, b], i) => (
+        <article>
+          <span class="n mono">0{i + 1}</span>
+          <h3>{t}</h3>
+          <p>{a}</p>
+          <p class="b">{b}</p>
+        </article>
+      ))}
+    </div>
+    <pre class="ex"><code><span class="d">~/projects/old-api</span>
+  Cargo.toml
+  target/        <span class="y">&lt;- Rust output, 6.4 GB, goes</span>
+<span class="d">~/projects/notes</span>
+  target/        <span class="y">&lt;- no marker, stays</span></code></pre>
+  </div>
+</section>
+<style>
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0; border: 1px solid var(--line); border-radius: 16px; overflow: hidden; }
+  article { padding: 28px 24px 32px; border-right: 1px solid var(--line); background: var(--surface); display: grid; gap: 12px; align-content: start; }
+  article:last-child { border-right: 0; }
+  .n { color: var(--accent); font-size: 13px; }
+  h3 { text-transform: uppercase; font-size: 1.7rem; }
+  article p { color: var(--ink); }
+  article .b { color: var(--muted); font-size: 15px; }
+  .ex { margin: 32px 0 0; background: var(--hero-bg); color: var(--hero-ink); border-radius: 14px; padding: 22px 24px; overflow-x: auto; font: 14px/1.7 var(--mono); }
+  .ex .d { color: var(--hero-muted); }
+  .ex .y { color: var(--hero-accent); }
+  @media (max-width: 640px) { article { border-right: 0; border-bottom: 1px solid var(--line); } article:last-child { border-bottom: 0; } }
+</style>
