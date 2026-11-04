@@ -218,20 +218,28 @@ enum Treemap {
 // MARK: - Colours
 
 private enum DiskMapPalette {
-    static let folder = Color(red: 0.16, green: 0.52, blue: 0.56)
-    static let file = Color(red: 0.45, green: 0.50, blue: 0.54)
-    static let package = Theme.accent
-    static let smaller = Color(red: 0.62, green: 0.65, blue: 0.67)
+    static let smaller = Color(red: 0.55, green: 0.58, blue: 0.60)
 
-    static func color(for node: DiskNode, index: Int) -> Color {
-        let base: Color
-        if node.isSynthetic { base = smaller }
-        else if node.isPackage { base = package }
-        else if node.isDirectory { base = folder }
-        else { base = file }
-        // Slight variation so neighbours of the same kind stay apart.
-        let shade = [0.0, 0.10, 0.20][index % 3]
-        return shade == 0 ? base : base.opacity(1 - shade)
+    /// Distinct hues, dark enough for white labels in light and dark mode.
+    static let hues: [Color] = [
+        Color(red: 0.91, green: 0.36, blue: 0.22),  // orange
+        Color(red: 0.17, green: 0.55, blue: 0.60),  // teal
+        Color(red: 0.42, green: 0.36, blue: 0.80),  // violet
+        Color(red: 0.20, green: 0.58, blue: 0.36),  // green
+        Color(red: 0.84, green: 0.27, blue: 0.47),  // pink
+        Color(red: 0.18, green: 0.45, blue: 0.78),  // blue
+        Color(red: 0.80, green: 0.56, blue: 0.14),  // amber
+        Color(red: 0.58, green: 0.30, blue: 0.66),  // purple
+        Color(red: 0.10, green: 0.60, blue: 0.55),  // sea green
+        Color(red: 0.75, green: 0.33, blue: 0.20),  // brick
+    ]
+
+    /// The colour follows the rank by size among siblings, so the biggest
+    /// items differ and a folder has the same colour in the map and the list.
+    static func color(for node: DiskNode, among siblings: [DiskNode]) -> Color {
+        if node.isSynthetic { return smaller }
+        let rank = siblings.filter { !$0.isSynthetic }.sorted { $0.size > $1.size }.firstIndex { $0.id == node.id } ?? 0
+        return hues[rank % hues.count]
     }
 
     static func kind(_ node: DiskNode) -> String {
@@ -390,7 +398,7 @@ struct DiskMapView: View {
                 GeometryReader { geo in
                     ZStack(alignment: .leading) {
                         Capsule().fill(Color.secondary.opacity(0.15))
-                        Capsule().fill(DiskMapPalette.color(for: node, index: 0))
+                        Capsule().fill(DiskMapPalette.color(for: node, among: model.current?.children ?? []))
                             .frame(width: max(2, geo.size.width * fraction))
                     }
                 }
@@ -476,7 +484,7 @@ private struct TreemapCanvas: View {
         guard rect.width > 0, rect.height > 0 else { return }
         let hovered = model.hoverID == tile.node.id
         let selected = model.selectionID == tile.node.id
-        var color = DiskMapPalette.color(for: tile.node, index: index)
+        var color = DiskMapPalette.color(for: tile.node, among: model.current?.children ?? [])
         if hovered { color = color.opacity(0.85) }
         let path = Path(roundedRect: rect, cornerRadius: 3)
         ctx.fill(path, with: .color(color))
