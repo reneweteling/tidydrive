@@ -71,13 +71,14 @@ public struct ToolchainScanner: Scanner {
         let sizes = Sizer.sizes(listed.map(\.0.path))
         var items = listed.map { install, status, detail in
             CleanupItem(
-                id: "toolchain:\(install.path)", category: .toolchains, group: Self.displayName(install.language),
+                id: "toolchain:\(install.path)", category: .toolchains, group: "\(Self.displayName(install.language)) · \(install.manager)",
                 title: "\(Self.displayName(install.language)) \(install.version) · \(status)", detail: detail, path: install.path,
                 size: sizes[install.path] ?? 0, risk: .careful, selectedByDefault: false,
                 action: install.uninstall.map { .commands([$0], fallbackDelete: [install.path]) } ?? .delete([install.path])
             )
         }
         items += corepackVersions(context)
+        items += pnpmSelfVersions(context)
         items += homebrewDuplicates(context)
         return (items, [])
     }
@@ -243,6 +244,59 @@ public struct ToolchainScanner: Scanner {
                         path: path, size: sizes[path] ?? 0, risk: .rebuild, selectedByDefault: !newest, action: .delete([path])
                     ))
                 }
+            }
+        }
+        return items
+    }
+
+    /// pnpm updates itself into $PNPM_HOME/.tools/pnpm. Each version is
+    /// either a folder, or a symlink ("12.3.4 -> 12.3.4_tmp_49311") to the
+    /// folder pnpm actually installed into. A `_tmp_` folder is only a
+    /// leftover when no version points at it; otherwise it IS that version.
+    func pnpmSelfVersions(_ context: ScanContext) -> [CleanupItem] {
+        var items: [CleanupItem] = []
+        let homes = [ProcessInfo.processInfo.environment["PNPM_HOME"], context.path("Library/pnpm"), context.path(".local/share/pnpm")]
+            .compactMap { $0 }
+        var seen = Set<String>()
+        for home in homes where seen.insert(home).inserted && FileSystem.isDirectory(home) {
+            let tools = "\(home)/.tools/pnpm"
+            let names = FileSystem.children(of: tools)
+
+            // version -> (paths to remove, folder holding the files)
+            var versions: [(version: String, remove: [String], content: String)] = []
+            var referenced = Set<String>()
+            for name in names where !name.contains("_tmp_") && name.first?.isNumber == true {
+                let path = "\(tools)/\(name)"
+                if let target = try? FileManager.default.destinationOfSymbolicLink(atPath: path) {
+                    let resolved = target.hasPrefix("/") ? target : "\(tools)/\(target)"
+                    referenced.insert(SafetyGuard.normalize(resolved))
+                    versions.append((name, [path, resolved], resolved))
+                } else if FileSystem.isDirectory(path) {
+                    versions.append((name, [path], path))
+                }
+            }
+            versions.sort { Self.compareVersions($0.version, $1.version) == .orderedDescending }
+            let leftovers = names.filter { $0.contains("_tmp_") }.map { "\(tools)/\($0)" }
+                .filter { !referenced.contains(SafetyGuard.normalize($0)) }
+
+            let sizes = Sizer.sizes(versions.map(\.content) + leftovers)
+            for (index, v) in versions.enumerated() {
+                let newest = index == 0
+                items.append(CleanupItem(
+                    id: "pnpm-self:\(tools)/\(v.version)", category: .toolchains, group: "Package managers",
+                    title: "pnpm \(v.version) · \(newest ? "newest" : "older")",
+                    detail: "pnpm self-update · " + (newest ? "the newest pnpm it installed" : "pnpm downloads it again if a project's packageManager asks for it"),
+                    path: v.content, size: sizes[v.content] ?? 0, risk: .rebuild, selectedByDefault: !newest, action: .delete(v.remove)
+                ))
+            }
+            if !leftovers.isEmpty {
+                items.append(CleanupItem(
+                    id: "pnpm-tmp:\(home)", category: .toolchains, group: "Package managers",
+                    title: "pnpm · interrupted installs",
+                    detail: "\(leftovers.count) _tmp_ folders no pnpm version points at",
+                    path: tools, size: leftovers.reduce(0) { $0 + (sizes[$1] ?? 0) }, risk: .safe, selectedByDefault: true,
+                    action: .delete(leftovers)
+                ))
             }
         }
         return items

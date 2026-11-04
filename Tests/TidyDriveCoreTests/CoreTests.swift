@@ -353,3 +353,29 @@ final class TransparencyTests: XCTestCase {
         XCTAssertGreaterThan(px[(200 * 400 + 200) * 4 + 3], 245, "centre should be opaque")
     }
 }
+
+final class PnpmVersionTests: XCTestCase {
+    func testSymlinkedTmpFoldersAreVersionsNotLeftovers() throws {
+        let home = FileManager.default.temporaryDirectory.appendingPathComponent("tidydrive-pnpm-\(UUID().uuidString)")
+        let tools = home.appendingPathComponent("Library/pnpm/.tools/pnpm")
+        let fm = FileManager.default
+        defer { try? fm.removeItem(at: home) }
+        // 12.3.4 is a symlink to the folder pnpm really installed into.
+        for dir in ["12.3.4_tmp_49311/bin", "10.6.2/bin", "9.0.0_tmp_1/bin"] {
+            try fm.createDirectory(at: tools.appendingPathComponent(dir), withIntermediateDirectories: true)
+            try Data(repeating: 1, count: 5000).write(to: tools.appendingPathComponent(dir).appendingPathComponent("pnpm"))
+        }
+        try fm.createSymbolicLink(atPath: tools.appendingPathComponent("12.3.4").path, withDestinationPath: "12.3.4_tmp_49311")
+
+        let context = ScanContext(home: home.path, settings: ScanSettings(projectRoots: []), shell: Shell(resolver: ToolResolver()))
+        let items = ToolchainScanner().pnpmSelfVersions(context).filter { $0.path?.hasPrefix(home.path) == true }
+
+        let newest = try XCTUnwrap(items.first { $0.title.hasPrefix("pnpm 12.3.4") })
+        XCTAssertFalse(newest.selectedByDefault, "the newest pnpm stays")
+        XCTAssertTrue(newest.size > 0, "size comes from the folder the symlink points at")
+        let leftovers = try XCTUnwrap(items.first { $0.title.contains("interrupted") })
+        guard case .delete(let paths) = leftovers.action else { return XCTFail() }
+        XCTAssertEqual(paths.map { ($0 as NSString).lastPathComponent }, ["9.0.0_tmp_1"], "only the folder no version points at")
+        XCTAssertNotNil(items.first { $0.title.hasPrefix("pnpm 10.6.2") })
+    }
+}
