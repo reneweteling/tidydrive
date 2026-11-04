@@ -158,6 +158,9 @@ struct CategoryDetail: View {
                     .padding(.horizontal, 20).padding(.bottom, 8)
             }
 
+            if category == .projects {
+                ProjectTree(model: model, items: items)
+            } else {
             List {
                 ForEach(groups, id: \.name) { group in
                     Section {
@@ -176,24 +179,129 @@ struct CategoryDetail: View {
                 }
             }
             .listStyle(.inset)
+            }
         }
+    }
+}
+
+/// Projects as a tree: one row per project with its total, status and a pin
+/// to keep it, and its dependency and build folders nested underneath.
+struct ProjectTree: View {
+    @ObservedObject var model: AppModel
+    let items: [CleanupItem]
+    @State private var sort: Sort = .size
+    @State private var expanded: Set<String> = []
+
+    enum Sort: String, CaseIterable { case size = "Size", name = "Name" }
+
+    struct Project: Identifiable {
+        var id: String { path }
+        var path: String
+        var name: String
+        var items: [CleanupItem]
+        var size: Int64 { items.reduce(0) { $0 + $1.size } }
+        var stale: Bool { items.contains { $0.group.hasPrefix("Stale") } }
+        /// "last commit 4 months ago" or "uncommitted changes", shared by all its items.
+        var status: String { items.first?.detail.components(separatedBy: " · ").dropFirst().joined(separator: " · ") ?? "" }
+        var ecosystems: String { Array(Set(items.compactMap { $0.detail.components(separatedBy: " · ").first })).sorted().joined(separator: ", ") }
+    }
+
+    private var projects: [Project] {
+        let grouped = Dictionary(grouping: items) { $0.project ?? $0.title }
+        let list = grouped.map { path, items in
+            Project(path: path, name: (path as NSString).lastPathComponent, items: items.sorted { $0.size > $1.size })
+        }
+        switch sort {
+        case .size: return list.sorted { $0.size > $1.size }
+        case .name: return list.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        }
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 10) {
+                Text("\(projects.count) projects").font(.system(size: 12)).foregroundStyle(.secondary)
+                Spacer()
+                Picker("Sort by", selection: $sort) {
+                    ForEach(Sort.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .frame(width: 140)
+                .help("Sort projects by size or by name")
+                Button(expanded.isEmpty ? "Expand all" : "Collapse all") {
+                    expanded = expanded.isEmpty ? Set(projects.map(\.path)) : []
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 8)
+
+            List {
+                ForEach(projects) { project in
+                    DisclosureGroup(isExpanded: Binding(
+                        get: { expanded.contains(project.path) },
+                        set: { open in if open { expanded.insert(project.path) } else { expanded.remove(project.path) } }
+                    )) {
+                        ForEach(project.items) { item in
+                            ItemRow(model: model, item: item, titleOverride: String(item.title.dropFirst(project.name.count + 1)), showPin: false)
+                        }
+                    } label: {
+                        projectRow(project)
+                    }
+                }
+            }
+            .listStyle(.inset)
+        }
+    }
+
+    private func projectRow(_ project: Project) -> some View {
+        HStack(spacing: 10) {
+            CheckBox(state: model.checkState(for: project.items)) { model.toggle(items: project.items) }
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text(project.name).font(.system(size: 13, weight: .semibold))
+                    Text(project.stale ? "stale" : "active")
+                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                        .padding(.horizontal, 6).padding(.vertical, 1)
+                        .foregroundStyle(project.stale ? Theme.riskColor(.safe) : .secondary)
+                        .background((project.stale ? Theme.riskColor(.safe) : Color.secondary).opacity(0.14), in: Capsule())
+                }
+                Text("\(project.items.count) folder\(project.items.count == 1 ? "" : "s") · \(project.ecosystems) · \(project.status)")
+                    .font(.system(size: 11, design: .monospaced)).foregroundStyle(.secondary).lineLimit(1)
+            }
+            Spacer(minLength: 12)
+            Button {
+                model.keep(project: project.path)
+            } label: {
+                Label("Keep", systemImage: "pin")
+            }
+            .buttonStyle(.borderless)
+            .help("Keep \(project.name): an active project, never offer its files for cleaning")
+            Text(ByteFormat.string(project.size))
+                .font(.system(size: 13, weight: .semibold)).monospacedDigit()
+                .frame(width: 76, alignment: .trailing)
+        }
+        .padding(.vertical, 3)
+        .contentShape(Rectangle())
     }
 }
 
 struct ItemRow: View {
     @ObservedObject var model: AppModel
     let item: CleanupItem
+    var titleOverride: String? = nil
+    var showPin = true
 
     var body: some View {
         HStack(spacing: 10) {
             CheckBox(state: model.selection.contains(item.id) ? .on : .off) { model.toggle(item) }
             VStack(alignment: .leading, spacing: 2) {
-                Text(item.title).font(.system(size: 13, weight: .medium)).lineLimit(1).truncationMode(.middle)
+                Text(titleOverride ?? item.title).font(.system(size: 13, weight: .medium)).lineLimit(1).truncationMode(.middle)
                 Text(item.detail).font(.system(size: 11, design: .monospaced)).foregroundStyle(.secondary)
                     .lineLimit(2).truncationMode(.middle)
             }
             Spacer(minLength: 12)
-            if let project = item.project {
+            if showPin, let project = item.project {
                 Button { model.keep(project: project) } label: { Image(systemName: "pin") }
                     .buttonStyle(.borderless)
                     .foregroundStyle(.secondary)
