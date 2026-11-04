@@ -79,16 +79,23 @@ final class AppModel: ObservableObject {
 
     // MARK: - Scanning
 
+    /// Built on first use: a scan loaded from the cache never made one, and
+    /// cleaning needs it just as much.
+    private func toolResolver() async -> ToolResolver {
+        if let resolver { return resolver }
+        let path = await Task.detached { ToolResolver.loginShellPath() }.value
+        let made = ToolResolver(loginShellPath: path)
+        resolver = made
+        return made
+    }
+
     func scan() async {
         guard !isPreview, phase == .idle else { return }
         phase = .scanning("Starting")
         Telemetry.breadcrumb("scan.started")
 
-        if resolver == nil {
-            let path = await Task.detached { ToolResolver.loginShellPath() }.value
-            resolver = ToolResolver(loginShellPath: path)
-        }
-        let context = ScanContext(home: home, settings: settings.scanSettings, shell: Shell(resolver: resolver!))
+        let resolver = await toolResolver()
+        let context = ScanContext(home: home, settings: settings.scanSettings, shell: Shell(resolver: resolver))
         let scanned = await ScanEngine().scan(context) { category, done, total in
             Task { @MainActor in
                 if case .scanning = self.phase { self.phase = .scanning("\(category.title) done, \(done) of \(total)") }
@@ -187,8 +194,9 @@ final class AppModel: ObservableObject {
 
     func clean() async {
         let items = selectedItems
-        guard !isPreview, phase == .idle, !items.isEmpty, let resolver else { return }
+        guard !isPreview, phase == .idle, !items.isEmpty else { return }
         phase = .cleaning(done: 0, total: items.count, current: items[0].title)
+        let resolver = await toolResolver()
         Telemetry.breadcrumb("clean.started", data: ["items": items.count])
 
         // Apps (and their data) can only go while they are not running.
