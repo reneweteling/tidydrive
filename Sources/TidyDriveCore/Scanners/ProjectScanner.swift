@@ -30,6 +30,11 @@ public struct ProjectScanner: Scanner {
         var found: [Found] = []
         for root in roots {
             for child in FileSystem.subdirectories(of: root) where !child.hasPrefix(".") {
+                // A linked git worktree has a .git file instead of a folder.
+                // Git worktrees lists it as a whole, so it is not counted twice.
+                var isDir: ObjCBool = false
+                if FileManager.default.fileExists(atPath: "\(root)/\(child)/.git", isDirectory: &isDir), !isDir.boolValue,
+                   context.settings.categories.contains(.worktrees) { continue }
                 walk("\(root)/\(child)", depth: 1, projectRoot: "\(root)/\(child)", into: &found)
             }
         }

@@ -6,6 +6,7 @@ struct PopoverView: View {
     @ObservedObject var settings: AppSettings
     var openReview: (Category?) -> Void
     var openSettings: () -> Void
+    var openDiskMap: () -> Void = {}
     var quit: () -> Void
 
     var body: some View {
@@ -133,6 +134,7 @@ struct PopoverView: View {
     private var footer: some View {
         HStack(spacing: 14) {
             Button("Rescan") { Task { await model.scan() } }.disabled(model.phase != .idle)
+            Button("Disk Map", action: openDiskMap)
             Button("Settings…", action: openSettings)
             Spacer()
             Button("Quit", action: quit)

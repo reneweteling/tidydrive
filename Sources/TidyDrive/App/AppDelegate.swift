@@ -9,6 +9,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
     private let popover = NSPopover()
     private var reviewWindow: NSWindow?
     private var settingsWindow: NSWindow?
+    private var diskMapWindow: NSWindow?
     private var cancellables: Set<AnyCancellable> = []
 
     private let model = AppModel.shared
@@ -32,6 +33,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
             model: model, settings: settings,
             openReview: { [weak self] category in self?.showReview(category) },
             openSettings: { [weak self] in self?.showSettings() },
+            openDiskMap: { [weak self] in self?.showDiskMap() },
             quit: { NSApp.terminate(nil) }
         ))
         hosting.sizingOptions = [.preferredContentSize]
@@ -115,6 +117,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
         present(reviewWindow!)
     }
 
+    func showDiskMap() {
+        popover.performClose(nil)
+        if diskMapWindow == nil {
+            let window = NSWindow(contentViewController: NSHostingController(rootView: DiskMapView()))
+            window.title = "TidyDrive Disk Map"
+            window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
+            window.setContentSize(NSSize(width: 1080, height: 700))
+            window.isReleasedWhenClosed = false
+            window.delegate = self
+            window.center()
+            window.setFrameAutosaveName("TidyDriveDiskMap")
+            diskMapWindow = window
+        }
+        present(diskMapWindow!)
+    }
+
     func showSettings() {
         popover.performClose(nil)
         if settingsWindow == nil {
@@ -139,7 +157,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
 
     func windowWillClose(_ notification: Notification) {
         DispatchQueue.main.async {
-            let open = [self.reviewWindow, self.settingsWindow].compactMap { $0 }.filter(\.isVisible)
+            let open = [self.reviewWindow, self.settingsWindow, self.diskMapWindow].compactMap { $0 }.filter(\.isVisible)
             if open.isEmpty { NSApp.setActivationPolicy(.accessory) }
         }
         if (notification.object as? NSWindow) === settingsWindow {

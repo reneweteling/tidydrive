@@ -46,9 +46,12 @@ public enum Category: String, Codable, CaseIterable, Sendable, Identifiable {
     case toolchains
     case docker
     case android
+    case worktrees
     case videos
     case photos
     case duplicates
+    case apps
+    case appData
 
     public var id: String { rawValue }
 
@@ -66,6 +69,9 @@ public enum Category: String, Codable, CaseIterable, Sendable, Identifiable {
         case .toolchains: return "Language versions"
         case .docker: return "Docker"
         case .android: return "Android"
+        case .worktrees: return "Git worktrees"
+        case .apps: return "Apps"
+        case .appData: return "App data and VMs"
         case .videos: return "Videos to shrink"
         case .photos: return "Photos to shrink"
         case .duplicates: return "Duplicate photos"
@@ -84,6 +90,9 @@ public enum Category: String, Codable, CaseIterable, Sendable, Identifiable {
         case .toolchains: return "chevron.left.forwardslash.chevron.right"
         case .docker: return "cube.transparent"
         case .android: return "apps.iphone"
+        case .worktrees: return "arrow.triangle.branch"
+        case .apps: return "app.badge"
+        case .appData: return "externaldrive"
         case .videos: return "film"
         case .photos: return "photo"
         case .duplicates: return "square.on.square"

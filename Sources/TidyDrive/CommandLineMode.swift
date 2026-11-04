@@ -10,15 +10,20 @@ enum CommandLineMode {
 
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         var roots: [String] = []
+        var only: Set<Category> = []
         var i = 0
         while i < args.count {
             if args[i] == "--root", i + 1 < args.count { roots.append(args[i + 1]); i += 1 }
+            if args[i] == "--only", i + 1 < args.count {
+                only.formUnion(args[i + 1].split(separator: ",").compactMap { Category(rawValue: String($0)) })
+                i += 1
+            }
             i += 1
         }
         if roots.isEmpty { roots = ScanSettings.defaultProjectRoots(home: home) }
 
         let resolver = ToolResolver(loginShellPath: ToolResolver.loginShellPath())
-        let context = ScanContext(home: home, settings: ScanSettings(projectRoots: roots), shell: Shell(resolver: resolver))
+        let context = ScanContext(home: home, settings: ScanSettings(projectRoots: roots, categories: only.isEmpty ? Set(Category.allCases) : only), shell: Shell(resolver: resolver))
         let semaphore = DispatchSemaphore(value: 0)
         Task.detached {
             let started = Date()
