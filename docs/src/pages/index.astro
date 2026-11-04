@@ -9,12 +9,73 @@ import Steps from '../components/Steps.astro';
 import Faq from '../components/Faq.astro';
 import Maker from '../components/Maker.astro';
 import Footer from '../components/Footer.astro';
+import { faq } from '../data/faq';
 
 const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
-const title = 'TidyDrive: free your disk from developer clutter';
-const description = 'TidyDrive is a macOS menu bar app that watches your disk and shows what can go: Xcode, simulators, build output, package caches, old language versions and Docker.';
-const canonical = 'https://reneweteling.github.io/tidydrive/';
-const ogImage = 'https://reneweteling.github.io/tidydrive/assets/review.png';
+const title = 'TidyDrive: free up disk space on your Mac, made for developers';
+const description = 'Free macOS menu bar app that finds what fills a developer Mac: Xcode, simulators, node_modules, build output, package caches, git worktrees, Docker, old language versions, big videos and photos. You review every item before it goes.';
+const site = 'https://reneweteling.github.io/tidydrive/';
+const ogImage = `${site}assets/og.png`;
+const ogAlt = 'TidyDrive: your disk is full, take it back. Mac disk cleaner for developers.';
+const download = 'https://github.com/reneweteling/tidydrive/releases/latest/download/TidyDrive.dmg';
+
+const person = {
+  '@type': 'Person',
+  '@id': 'https://www.weteling.com/#person',
+  name: 'René Weteling',
+  url: 'https://www.weteling.com',
+  image: `${site}assets/rene.jpg`,
+  sameAs: ['https://github.com/reneweteling'],
+};
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@graph': [
+    {
+      '@type': 'WebSite',
+      '@id': `${site}#website`,
+      url: site,
+      name: 'TidyDrive',
+      inLanguage: 'en',
+      publisher: { '@id': person['@id'] },
+    },
+    {
+      '@type': 'SoftwareApplication',
+      '@id': `${site}#app`,
+      name: 'TidyDrive',
+      description,
+      url: site,
+      image: ogImage,
+      screenshot: [`${site}assets/review.png`, `${site}assets/popover.png`],
+      applicationCategory: 'UtilitiesApplication',
+      operatingSystem: 'macOS 14 or later (Apple Silicon)',
+      downloadUrl: download,
+      installUrl: download,
+      license: 'https://polyformproject.org/licenses/noncommercial/1.0.0',
+      isAccessibleForFree: true,
+      offers: { '@type': 'Offer', price: '0', priceCurrency: 'EUR' },
+      featureList: [
+        'Xcode DerivedData, archives, device support and old simulators',
+        'node_modules, build output and caches in stale projects',
+        'Package manager caches: npm, pnpm, Yarn, Homebrew, CocoaPods, Gradle, Cargo, pip and more',
+        'Unused language versions from asdf, mise, nvm, pyenv, rbenv, rustup and SDKMAN',
+        'Git worktrees left behind by coding agents',
+        'Docker images, build cache and volumes per project',
+        'Apps with their data, virtual machines and app caches',
+        'Shrink videos to HEVC MP4 and photos to HEIC',
+        'Find duplicate photos',
+        'Disk map to explore what takes space',
+        'One warning when the disk passes 90%',
+      ],
+      author: { '@id': person['@id'] },
+    },
+    person,
+    {
+      '@type': 'FAQPage',
+      '@id': `${site}#faq`,
+      mainEntity: faq.map(([q, a]) => ({ '@type': 'Question', name: q, acceptedAnswer: { '@type': 'Answer', text: a } })),
+    },
+  ],
+};
 ---
 <!doctype html>
 <html lang="en">
@@ -23,19 +84,36 @@ const ogImage = 'https://reneweteling.github.io/tidydrive/assets/review.png';
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{title}</title>
     <meta name="description" content={description} />
-    <link rel="canonical" href={canonical} />
+    <link rel="canonical" href={site} />
     <meta name="author" content="René Weteling" />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
     <meta name="theme-color" content="#0d1517" />
-    <meta property="og:title" content="TidyDrive" />
-    <meta property="og:description" content="Your disk is full. Take it back." />
-    <meta property="og:image" content={ogImage} />
-    <meta property="og:url" content={canonical} />
+
     <meta property="og:type" content="website" />
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="TidyDrive" />
-    <meta name="twitter:description" content="Your disk is full. Take it back." />
+    <meta property="og:site_name" content="TidyDrive" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:url" content={site} />
+    <meta property="og:title" content="TidyDrive: your disk is full. Take it back." />
+    <meta property="og:description" content={description} />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:image:secure_url" content={ogImage} />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="1200" />
+    <meta property="og:image:alt" content={ogAlt} />
+
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="TidyDrive: your disk is full. Take it back." />
+    <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={ogImage} />
+    <meta name="twitter:image:alt" content={ogAlt} />
+
     <link rel="icon" type="image/svg+xml" href={`${base}favicon.svg`} />
+    <link rel="icon" type="image/png" sizes="512x512" href={`${base}assets/icon.png`} />
+    <link rel="apple-touch-icon" href={`${base}apple-touch-icon.png`} />
+    <link rel="sitemap" href={`${base}sitemap.xml`} />
+    <link rel="alternate" type="text/plain" title="LLM summary" href={`${base}llms.txt`} />
+    <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
   </head>
   <body>
     <Hero />

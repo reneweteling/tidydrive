@@ -17,7 +17,7 @@ const githubUrl = 'https://github.com/reneweteling/tidydrive';
         <span class="kicker">Menu bar app for developers</span>
         <h1>Your disk is <em>full.</em><br />Take it back.</h1>
         <p class="pitch">
-          TidyDrive watches your disk and shows what can go: Xcode, simulators, build output, package caches, old language versions and Docker.
+          TidyDrive watches your disk and shows what can go: Xcode, simulators, node_modules, package caches, git worktrees, old language versions, Docker and oversized videos and photos.
         </p>
         <div class="cta">
           <a class="btn primary" href={downloadUrl}>
@@ -46,7 +46,7 @@ const githubUrl = 'https://github.com/reneweteling/tidydrive';
 
     <figure class="video">
       <div class="vbox shot" data-label="demo.mp4 goes here">
-        <video autoplay muted loop playsinline preload="metadata" poster={asset('assets/demo-poster.png')}>
+        <video aria-label="TidyDrive demo: scan, review and clean a full Mac disk" autoplay muted loop playsinline preload="metadata" poster={asset('assets/demo-poster.png')}>
           <source src={asset('assets/demo.mp4')} type="video/mp4" />
         </video>
       </div>

@@ -1,0 +1,35 @@
+# TidyDrive
+
+> TidyDrive is a free macOS menu bar app (macOS 14+, Apple Silicon) that frees disk space on developer Macs. It scans for what developer tools leave behind, shows every item with its size and risk, and removes only what you select. Made by René Weteling (https://www.weteling.com).
+
+## What it cleans
+
+- Xcode: DerivedData, archives, iOS device support, old simulators and runtimes
+- Projects: node_modules, build output (dist, target, .next, build, Pods, .venv) in stale projects; active projects can be kept
+- Package manager caches: npm, pnpm, Yarn, Bun, Homebrew, CocoaPods, Gradle, Maven, Cargo, pip, uv, Go, Composer and more
+- Language versions: every version installed by asdf, mise, nvm, pyenv, rbenv, rustup, SDKMAN and corepack, with the projects that use each one
+- Git worktrees, including the ones coding agents leave in .claude/worktrees, plus git gc for repositories with loose objects
+- Docker: images, build cache and volumes, per project
+- Apps with their data, virtual machines (UTM, Parallels, VMware, VirtualBox), iOS backups and app caches
+- Media: shrink videos to HEVC MP4 and photos to HEIC after a quality test, and find duplicate photos
+- A disk map to explore what takes space
+
+## How it decides
+
+- Safe: caches that tools download again. Rebuild: output your build makes again. Careful: data that does not come back; never preselected.
+- Large files, apps and duplicates go to the Trash. Converted originals go to the Trash.
+- A safety guard refuses home folders, personal folders and project roots.
+- It warns once when the disk passes 90%, and again only after it drops below 85%.
+
+## Facts
+
+- Price: free for noncommercial use, PolyForm Noncommercial 1.0.0
+- Distribution: signed and notarized DMG on GitHub releases, not the Mac App Store (the sandbox blocks ~/Library/Developer and the Docker socket)
+- Privacy: scanning and cleaning happen on the Mac; only crash reports go to Sentry, without file paths, and they can be switched off
+
+## Links
+
+- Website: https://reneweteling.github.io/tidydrive/
+- Download: https://github.com/reneweteling/tidydrive/releases/latest/download/TidyDrive.dmg
+- Source: https://github.com/reneweteling/tidydrive
+- Maker: https://www.weteling.com
