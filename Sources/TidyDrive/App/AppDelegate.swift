@@ -11,6 +11,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
     private var settingsWindow: NSWindow?
     private var diskMapWindow: NSWindow?
     private var cancellables: Set<AnyCancellable> = []
+    private var updateTimer: Timer?
 
     private let model = AppModel.shared
     private let settings = AppSettings.shared
@@ -47,7 +48,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
             .store(in: &cancellables)
         model.$phase
             .receive(on: RunLoop.main)
-            .sink { [weak self] _ in self?.updateStatusItem() }
+            .sink { [weak self] phase in
+                self?.updateStatusItem()
+                if phase == .idle { Task { await UpdateChecker.shared.installPendingIfIdle() } }
+            }
             .store(in: &cancellables)
 
         NotificationManager.shared.setUp()
@@ -62,7 +66,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
         if model.result == nil || (model.result?.finishedAt.timeIntervalSinceNow ?? 0) < -6 * 3600 {
             Task { await model.scan() }
         }
+        // Updates install themselves only while TidyDrive sits in the menu
+        // bar: no scan or clean running and no window open.
+        UpdateChecker.shared.isBusy = { [weak self] in
+            guard let self else { return true }
+            let windowOpen = [self.reviewWindow, self.settingsWindow, self.diskMapWindow].contains { $0?.isVisible == true }
+            return self.model.phase != .idle || windowOpen || self.popover.isShown
+        }
         Task { await UpdateChecker.shared.checkIfNeeded() }
+        updateTimer = Timer.scheduledTimer(withTimeInterval: 3 * 3600, repeats: true) { _ in
+            Task { @MainActor in await UpdateChecker.shared.checkIfNeeded() }
+        }
 
         // `open TidyDrive.app --args --show review|diskmap|settings` opens a
         // window straight away, for when the menu bar icon is hidden behind
@@ -241,7 +255,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
     func windowWillClose(_ notification: Notification) {
         DispatchQueue.main.async {
             let open = [self.reviewWindow, self.settingsWindow, self.diskMapWindow].compactMap { $0 }.filter(\.isVisible)
-            if open.isEmpty { NSApp.setActivationPolicy(.accessory) }
+            if open.isEmpty {
+                NSApp.setActivationPolicy(.accessory)
+                Task { await UpdateChecker.shared.installPendingIfIdle() }
+            }
         }
         if (notification.object as? NSWindow) === settingsWindow {
             // New project folders or categories should show up right away.

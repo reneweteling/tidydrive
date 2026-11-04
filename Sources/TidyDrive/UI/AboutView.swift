@@ -43,14 +43,22 @@ struct AboutView: View {
     }
 
     private var updatesRow: some View {
+        VStack(spacing: 4) {
         HStack(spacing: 10) {
             if updates.isChecking {
                 ProgressView().controlSize(.small)
                 Text("Checking for updates…").font(.caption).foregroundStyle(.secondary)
+            } else if let step = updates.installStep {
+                ProgressView().controlSize(.small)
+                Text("\(step)…").font(.caption).foregroundStyle(.secondary)
             } else if updates.isUpdateAvailable, let latest = updates.latestVersion {
                 Image(systemName: "arrow.down.circle.fill").foregroundStyle(Theme.accent)
                 Text("Update available: \(latest)").font(.caption)
-                Button("Download") { updates.openReleasesPage() }.controlSize(.small)
+                if updates.canInstall {
+                    Button("Install and restart") { Task { await updates.install() } }.controlSize(.small)
+                } else {
+                    Button("Download") { updates.openReleasesPage() }.controlSize(.small)
+                }
             } else if updates.lastCheckedAt != nil {
                 Image(systemName: "checkmark.circle.fill").foregroundStyle(Theme.riskColor(.safe))
                 Text("You're on the latest version").font(.caption).foregroundStyle(.secondary)
@@ -62,6 +70,10 @@ struct AboutView: View {
                 .buttonStyle(.borderless)
                 .disabled(updates.isChecking)
                 .help("Check for updates")
+        }
+            if let error = updates.installError {
+                Text("Update failed: \(error)").font(.caption).foregroundStyle(Theme.riskColor(.careful))
+            }
         }
     }
 

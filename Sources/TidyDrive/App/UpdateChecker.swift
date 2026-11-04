@@ -27,6 +27,41 @@ final class UpdateChecker: ObservableObject {
     @Published private(set) var isChecking: Bool = false
     @Published private(set) var lastCheckError: String?
     @Published private(set) var lastCheckedAt: Date?
+    /// "Downloading", "Checking", "Restarting" while an update installs.
+    @Published private(set) var installStep: String?
+    @Published private(set) var installError: String?
+    private(set) var dmgURL: URL?
+
+    /// Installs new releases on its own, when nothing else is going on.
+    var autoInstall: Bool {
+        get { UserDefaults.standard.object(forKey: "tidydrive.autoInstallUpdates") as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: "tidydrive.autoInstallUpdates"); objectWillChange.send() }
+    }
+    /// Asked before an automatic install, so it never interrupts a scan,
+    /// a clean or an open window.
+    var isBusy: () -> Bool = { false }
+
+    var canInstall: Bool { dmgURL != nil && (try? SelfUpdater.installedBundle()) != nil }
+
+    /// Called when TidyDrive goes quiet (a scan finished, a window closed).
+    func installPendingIfIdle() async {
+        guard isUpdateAvailable, autoInstall, canInstall, installStep == nil, installError == nil, !isBusy() else { return }
+        await install()
+    }
+
+    func install() async {
+        guard let dmgURL, installStep == nil else { return }
+        installError = nil
+        installStep = "Downloading"
+        do {
+            try await SelfUpdater.install(dmg: dmgURL) { step in
+                Task { @MainActor in self.installStep = step }
+            }
+        } catch {
+            installStep = nil
+            installError = error.localizedDescription
+        }
+    }
 
     private let repo = "reneweteling/tidydrive"
     private let minCheckInterval: TimeInterval = 24 * 3600
@@ -36,6 +71,11 @@ final class UpdateChecker: ObservableObject {
     private struct Release: Decodable {
         let tag_name: String
         let html_url: String
+        let assets: [Asset]?
+        struct Asset: Decodable {
+            let name: String
+            let browser_download_url: String
+        }
     }
 
     func checkIfNeeded() async {
@@ -88,9 +128,11 @@ final class UpdateChecker: ObservableObject {
             let newer = compareSemver(tag, currentVersion) == .orderedDescending
             latestVersion = tag.hasPrefix("v") ? String(tag.dropFirst()) : tag
             releaseURL = pageURL
+            dmgURL = release.assets?.first { $0.name.hasSuffix(".dmg") }.flatMap { URL(string: $0.browser_download_url) }
             isUpdateAvailable = newer
             lastCheckedAt = Date()
             UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: userDefaultsKey)
+            if newer { await installPendingIfIdle() }
         } catch {
             lastCheckError = error.localizedDescription
         }

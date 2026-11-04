@@ -33,6 +33,8 @@ struct SettingsView: View {
             Section {
                 Toggle("Open TidyDrive at login", isOn: Binding(get: { settings.launchAtLogin },
                                                                   set: { settings.launchAtLogin = $0 }))
+                Toggle("Install updates automatically", isOn: Binding(get: { updates.autoInstall },
+                                                                        set: { updates.autoInstall = $0 }))
                 Toggle("Send crash reports", isOn: $settings.crashReports)
                 Text("Crash reports go to Sentry with the app version only. No file names or paths are sent.")
                     .font(.caption).foregroundStyle(.secondary)
