@@ -7,6 +7,10 @@ public struct VersionUsage: Sendable {
     public private(set) var specs: [String: Set<String>] = [:]
     /// language -> number of projects that request something.
     public private(set) var projectCount: [String: Int] = [:]
+    /// language -> spec -> who asks for it (a project name or "your global config").
+    public private(set) var requesters: [String: [String: Set<String>]] = [:]
+    /// Who the next `add` calls are attributed to.
+    public var source = "your global config"
 
     public init() {}
 
@@ -15,17 +19,30 @@ public struct VersionUsage: Sendable {
         let s = Self.normalizeVersion(spec)
         guard !s.isEmpty else { return }
         specs[lang, default: []].insert(s)
+        requesters[lang, default: [:]][s, default: []].insert(source)
     }
 
     /// True when some spec points at this installed version.
     public func isUsed(language: String, version: String) -> Bool {
-        let v = Self.normalizeVersion(version)
-        for s in specs[Self.normalizeLanguage(language)] ?? [] {
-            if v == s || v.hasPrefix(s + ".") || v.hasPrefix(s + "-") { return true }
-            // rustup names toolchains "stable-aarch64-apple-darwin".
-            if v.hasPrefix(s + "-") { return true }
+        !matchingSpecs(language: language, version: version).isEmpty
+    }
+
+    /// The projects (and "your global config") whose version files point at this version.
+    public func users(language: String, version: String) -> [String] {
+        let lang = Self.normalizeLanguage(language)
+        let all = matchingSpecs(language: language, version: version).flatMap { requesters[lang]?[$0] ?? [] }
+        return Set(all).sorted { a, b in
+            // The global config first, then projects by name.
+            a == "your global config" ? b != "your global config" : (b == "your global config" ? false : a.localizedStandardCompare(b) == .orderedAscending)
         }
-        return false
+    }
+
+    private func matchingSpecs(language: String, version: String) -> [String] {
+        let v = Self.normalizeVersion(version)
+        // rustup names toolchains "stable-aarch64-apple-darwin".
+        return (specs[Self.normalizeLanguage(language)] ?? []).filter { s in
+            v == s || v.hasPrefix(s + ".") || v.hasPrefix(s + "-")
+        }
     }
 
     public static func normalizeLanguage(_ raw: String) -> String {
@@ -130,13 +147,15 @@ public struct VersionUsage: Sendable {
         if let text = FileSystem.readText("\(home)/.config/mise/config.toml") { _ = text }
 
         for root in roots {
-            visit(root, depth: 0, usage: &usage)
+            visit(root, root: root, depth: 0, usage: &usage)
         }
+        usage.source = "your global config"
         return usage
     }
 
-    private static func visit(_ dir: String, depth: Int, usage: inout VersionUsage) {
+    private static func visit(_ dir: String, root: String, depth: Int, usage: inout VersionUsage) {
         let before = usage.specs
+        usage.source = depth == 0 ? "your global config" : String(dir.dropFirst(root.count + 1))
         if usage.read(directory: dir), depth > 0 {
             for lang in usage.specs.keys where usage.specs[lang] != before[lang] || before[lang] == nil {
                 usage.projectCount[lang, default: 0] += 1
@@ -145,7 +164,7 @@ public struct VersionUsage: Sendable {
         guard depth < 4 else { return }
         for child in FileSystem.subdirectories(of: dir) {
             if child.hasPrefix(".") || ProjectRules.skipWhileWalking.contains(child) { continue }
-            visit("\(dir)/\(child)", depth: depth + 1, usage: &usage)
+            visit("\(dir)/\(child)", root: root, depth: depth + 1, usage: &usage)
         }
     }
 }

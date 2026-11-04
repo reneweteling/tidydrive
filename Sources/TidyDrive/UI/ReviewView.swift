@@ -32,8 +32,8 @@ struct ReviewView: View {
     }
 
     private var current: Category? {
-        if let category, model.visibleCategories.contains(category) { return category }
-        return model.visibleCategories.first
+        if let category, model.enabledCategories.contains(category) { return category }
+        return model.visibleCategories.first ?? model.enabledCategories.first
     }
 
     private var sidebar: some View {
@@ -42,16 +42,20 @@ struct ReviewView: View {
                 DiskGauge(status: disk, threshold: AppSettings.shared.threshold)
                     .padding(.bottom, 14)
             }
-            ForEach(model.visibleCategories) { c in
+            ForEach(model.enabledCategories) { c in
                 let selected = c == current
+                let empty = model.items(in: c).isEmpty
                 HStack(spacing: 8) {
                     Image(systemName: c.symbol).frame(width: 18)
                     Text(c.title).lineLimit(1)
                     Spacer(minLength: 4)
-                    Text(ByteFormat.string(model.result?.size(of: c) ?? 0))
-                        .font(.system(size: 11)).monospacedDigit()
-                        .foregroundStyle(selected ? .white.opacity(0.85) : .secondary)
+                    if !empty {
+                        Text(ByteFormat.string(model.result?.size(of: c) ?? 0))
+                            .font(.system(size: 11)).monospacedDigit()
+                            .foregroundStyle(selected ? .white.opacity(0.85) : .secondary)
+                    }
                 }
+                .opacity(empty && !selected ? 0.4 : 1)
                 .font(.system(size: 13, weight: selected ? .semibold : .regular))
                 .foregroundStyle(selected ? .white : .primary)
                 .padding(.horizontal, 10)
@@ -131,6 +135,7 @@ struct ReviewView: View {
 struct CategoryDetail: View {
     @ObservedObject var model: AppModel
     let category: Category
+    private var isScanning: Bool { if case .scanning = model.phase { return true } else { return false } }
     @State private var testing: MediaConversion.Kind?
     @State private var testItem: CleanupItem?
 
@@ -168,7 +173,18 @@ struct CategoryDetail: View {
             if category.isConversion {
                 MediaPanel(model: model, category: category, testing: $testing)
             }
-            if category == .projects {
+            if items.isEmpty {
+                VStack(spacing: 8) {
+                    Spacer()
+                    Image(systemName: category.symbol).font(.system(size: 34)).foregroundStyle(.tertiary)
+                    Text(model.result == nil || isScanning ? "Not scanned yet" : "Nothing to clean here")
+                        .font(.title3.weight(.semibold))
+                    Text(isScanning ? "The scan is still running." : "TidyDrive found nothing in this category on the last scan.")
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity)
+            } else if category == .projects {
                 ProjectTree(model: model, items: items)
             } else {
             List {

@@ -62,6 +62,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
             Task { await model.scan() }
         }
         Task { await UpdateChecker.shared.checkIfNeeded() }
+
+        // `open TidyDrive.app --args --show review|diskmap|settings` opens a
+        // window straight away, for when the menu bar icon is hidden behind
+        // the notch or a crowded menu bar.
+        let args = CommandLine.arguments
+        if let i = args.firstIndex(of: "--show"), i + 1 < args.count {
+            switch args[i + 1] {
+            case "review": showReview(nil)
+            case "diskmap": showDiskMap()
+            case "settings": showSettings()
+            default: break
+            }
+        }
+    }
+
+    /// A second launch (double-clicking the app while it runs) opens the
+    /// review window, so TidyDrive is reachable without its menu bar icon.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
+        if !hasVisibleWindows { showReview(nil) }
+        return true
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }

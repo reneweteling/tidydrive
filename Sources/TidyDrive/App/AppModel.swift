@@ -114,6 +114,9 @@ final class AppModel: ObservableObject {
 
     func items(in category: Category) -> [CleanupItem] { result?.items(in: category) ?? [] }
 
+    /// Every category the user has switched on, found something or not.
+    var enabledCategories: [Category] { Category.allCases.filter { settings.isEnabled($0) } }
+
     var visibleCategories: [Category] {
         Category.allCases.filter { settings.isEnabled($0) && (!items(in: $0).isEmpty || notes(for: $0).count > 0) }
     }

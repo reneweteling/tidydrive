@@ -51,6 +51,19 @@ final class ThresholdAlarmTests: XCTestCase {
 }
 
 final class VersionUsageTests: XCTestCase {
+    func testRemembersWhichProjectAsks() throws {
+        let root = NSTemporaryDirectory() + "vu-\(UUID().uuidString)"
+        for (name, file, text) in [("tafels", ".nvmrc", "24"), ("loft/web", ".tool-versions", "nodejs 24.1.0"), ("old", ".nvmrc", "18")] {
+            try FileManager.default.createDirectory(atPath: "\(root)/\(name)", withIntermediateDirectories: true)
+            try text.write(toFile: "\(root)/\(name)/\(file)", atomically: true, encoding: .utf8)
+        }
+        defer { try? FileManager.default.removeItem(atPath: root) }
+        let usage = VersionUsage.collect(home: root + "/nohome", roots: [root])
+        XCTAssertEqual(usage.users(language: "node", version: "24.1.0"), ["loft/web", "tafels"])
+        XCTAssertEqual(usage.users(language: "node", version: "18.2.0"), ["old"])
+        XCTAssertEqual(ToolchainScanner.usedBy(["a", "b", "c", "d", "e"]), "used by a, b, c and 2 more")
+    }
+
     func testPrefixMatching() {
         var usage = VersionUsage()
         usage.add(language: "nodejs", spec: "v20")

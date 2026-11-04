@@ -16,6 +16,13 @@ public struct ToolchainScanner: Scanner {
         var uninstall: Command?
     }
 
+    /// "used by tafels, loft-app and 4 more".
+    static func usedBy(_ users: [String]) -> String {
+        guard !users.isEmpty else { return "a version file asks for it" }
+        let shown = users.prefix(3).joined(separator: ", ")
+        return "used by " + shown + (users.count > 3 ? " and \(users.count - 3) more" : "")
+    }
+
     public func scan(_ context: ScanContext) -> ([CleanupItem], [ScanNote]) {
         let roots = context.settings.projectRoots.map { expandTilde($0, home: context.home) }
         let usage = VersionUsage.collect(home: context.home, roots: roots)
@@ -53,7 +60,7 @@ public struct ToolchainScanner: Scanner {
                 detail += " · your shell uses \(shellUses) for \(lang), not this one"
             } else if used {
                 status = "in use"
-                detail += " · a version file in your projects or your global config asks for it"
+                detail += " · " + Self.usedBy(usage.users(language: install.language, version: install.version))
             } else if isDefault {
                 status = "default"
                 detail += " · the default toolchain"
