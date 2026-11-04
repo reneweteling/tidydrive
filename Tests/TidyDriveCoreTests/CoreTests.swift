@@ -145,6 +145,19 @@ final class ProjectScannerTests: XCTestCase {
         XCTAssertTrue(items.allSatisfy { $0.risk == .rebuild && $0.size > 0 })
     }
 
+    func testKeptProjectsAreLeftAlone() {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let settings = ScanSettings(projectRoots: [root.path], categories: [.projects],
+                                    keptProjects: [root.appendingPathComponent("rusty").path, root.appendingPathComponent("mono").path])
+        let (items, notes) = ProjectScanner().scan(ScanContext(home: home, settings: settings, shell: Shell(resolver: ToolResolver())))
+        let titles = Set(items.map(\.title))
+        XCTAssertFalse(titles.contains("rusty/target"))
+        XCTAssertFalse(titles.contains("mono/packages/web/.next"), "everything inside a kept project is left alone")
+        XCTAssertTrue(titles.contains("shop/node_modules"))
+        XCTAssertTrue(items.allSatisfy { $0.project != nil })
+        XCTAssertTrue(notes.contains { $0.message.contains("2 kept projects") })
+    }
+
     func testRuleMatching() {
         let rust = ProjectRules.all.first { $0.ecosystem == "Rust" }!
         XCTAssertTrue(rust.matchesMarker(in: ["Cargo.toml", "src"]))

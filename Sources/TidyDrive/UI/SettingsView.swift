@@ -13,7 +13,7 @@ struct SettingsView: View {
             categories.tabItem { Label("Categories", systemImage: "square.grid.2x2") }
             about.tabItem { Label("About", systemImage: "info.circle") }
         }
-        .frame(width: 520, height: 400)
+        .frame(width: 540, height: 480)
     }
 
     private var general: some View {
@@ -59,6 +59,28 @@ struct SettingsView: View {
                 Button("Add Folder…", action: addFolder)
             }
             Section {
+                if settings.keptProjects.isEmpty {
+                    Text("None yet. Pin a project in the review window, or add one here.")
+                        .foregroundStyle(.secondary)
+                }
+                ForEach(settings.keptProjects, id: \.self) { project in
+                    HStack {
+                        Image(systemName: "pin.fill").foregroundStyle(Theme.accent)
+                        Text(project).font(.system(.body, design: .monospaced))
+                        Spacer()
+                        Button { settings.release(project) } label: { Image(systemName: "minus.circle") }
+                            .buttonStyle(.plain)
+                            .help("Offer this project's files for cleaning again")
+                    }
+                }
+                Button("Keep a Project…", action: keepFolder)
+            } header: {
+                Text("Kept projects")
+            } footer: {
+                Text("Projects you are working on. TidyDrive never offers their dependencies, build output or large files.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            Section {
                 Stepper("Stale after \(settings.staleDays) days without a commit", value: $settings.staleDays, in: 7...365, step: 7)
                 Picker("Large files from", selection: $settings.largeFileMB) {
                     ForEach([100, 250, 500, 1000, 2000], id: \.self) { mb in
@@ -86,37 +108,21 @@ struct SettingsView: View {
     }
 
     private var about: some View {
-        VStack(spacing: 12) {
-            AppGlyph(size: 72).padding(.top, 18)
-            Text("TidyDrive").font(.system(size: 22, weight: .bold))
-            Text("Version \(updates.currentVersion)").foregroundStyle(.secondary)
-            if updates.isUpdateAvailable, let latest = updates.latestVersion {
-                Button("Download \(latest)") { updates.openReleasesPage() }
-                    .buttonStyle(.borderedProminent).tint(Theme.accent)
-            } else {
-                Button(updates.isChecking ? "Checking…" : "Check for Updates") { Task { await updates.forceCheck() } }
-                    .disabled(updates.isChecking)
-            }
-            if let error = updates.lastCheckError {
-                Text(error).font(.caption).foregroundStyle(.secondary)
-            }
-            HStack(spacing: 16) {
-                Link("Website", destination: URL(string: "https://reneweteling.github.io/tidydrive/")!)
-                Link("Source", destination: URL(string: "https://github.com/reneweteling/tidydrive")!)
-                Link("Report a bug", destination: URL(string: "https://github.com/reneweteling/tidydrive/issues/new?template=bug.yml&version=\(updates.currentVersion)")!)
-            }
-            .font(.system(size: 12))
-            Spacer()
-            VStack(spacing: 4) {
-                Text("Made by René Weteling, agentic developer").font(.system(size: 12, weight: .medium))
-                Link("weteling.com: start a project", destination: URL(string: "https://www.weteling.com")!)
-                    .font(.system(size: 12, weight: .semibold))
-                    .tint(Theme.accent)
-            }
-            Text("© 2026 Felobo B.V. · PolyForm Noncommercial 1.0.0").font(.caption).foregroundStyle(.secondary)
-                .padding(.bottom, 14)
+        AboutView(updates: updates)
+    }
+
+    private func keepFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = true
+        panel.prompt = "Keep"
+        panel.message = "Choose the projects TidyDrive should leave alone."
+        if let first = settings.projectRoots.first {
+            panel.directoryURL = URL(fileURLWithPath: (first as NSString).expandingTildeInPath)
         }
-        .frame(maxWidth: .infinity)
+        guard panel.runModal() == .OK else { return }
+        for url in panel.urls { settings.keep(url.path) }
     }
 
     private func addFolder() {

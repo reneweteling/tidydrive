@@ -27,7 +27,6 @@ public struct ProjectScanner: Scanner {
             return ([], [ScanNote(category: .projects, message: "No project folder set. Add one in Settings, Projects.")])
         }
 
-        let t0 = Date(); func lap(_ s: String) { if ProcessInfo.processInfo.environment["TIDYDRIVE_DEBUG"] != nil { FileHandle.standardError.write("    projects: \(s) \(String(format: "%.1f", Date().timeIntervalSince(t0)))s\n".data(using: .utf8)!) } }
         var found: [Found] = []
         for root in roots {
             for child in FileSystem.subdirectories(of: root) where !child.hasPrefix(".") {
@@ -36,13 +35,12 @@ public struct ProjectScanner: Scanner {
         }
 
         // Drop anything git tracks: a committed vendor/ or dist/ is source.
-        lap("walk")
         let projects = Set(found.map(\.projectRoot))
         var infos: [String: ProjectInfo] = [:]
         for project in projects { infos[project] = projectInfo(project, context: context, found: found) }
+        let kept = Set(context.settings.keptProjects.map { SafetyGuard.normalize(expandTilde($0, home: context.home)) })
+        found = found.filter { !Self.isKept($0.projectRoot, kept) }
         found = found.filter { !isTracked($0.path, in: $0.projectRoot, git: infos[$0.projectRoot]?.isGit == true, context: context) }
-
-        lap("git info+tracked")
         let sizes = Sizer.sizes(found.map(\.path))
         let staleDays = context.settings.staleDays
         var items: [CleanupItem] = []
@@ -68,16 +66,19 @@ public struct ProjectScanner: Scanner {
                 size: sizes[f.path] ?? 0,
                 risk: .rebuild,
                 selectedByDefault: stale,
-                action: .delete([f.path])
+                action: .delete([f.path]),
+                project: f.projectRoot
             ))
         }
 
         if context.settings.categories.contains(.largeFiles) {
-            lap("sizes")
-            items += largeFiles(roots: roots, context: context)
-            lap("large files")
+            items += largeFiles(roots: roots, context: context).filter { !Self.isKept($0.path ?? "", kept) }
         }
-        return (items, [])
+        var notes: [ScanNote] = []
+        if !kept.isEmpty {
+            notes.append(ScanNote(category: .projects, message: "\(kept.count) kept project\(kept.count == 1 ? " is" : "s are") left alone. Manage them in Settings, Projects."))
+        }
+        return (items, notes)
     }
 
     // MARK: - Walking
@@ -214,6 +215,8 @@ public struct ProjectScanner: Scanner {
             }
         }
         detail += " · goes to the Trash"
+        let relative = path.dropFirst(root.count + 1)
+        let project = gitRoot(of: path, stopAt: root) ?? relative.split(separator: "/").first.map { "\(root)/\($0)" }
         return CleanupItem(
             id: "large:\(path)",
             category: .largeFiles,
@@ -224,7 +227,8 @@ public struct ProjectScanner: Scanner {
             size: size,
             risk: .careful,
             selectedByDefault: false,
-            action: .trash([path])
+            action: .trash([path]),
+            project: project
         )
     }
 
@@ -235,6 +239,11 @@ public struct ProjectScanner: Scanner {
             dir = (dir as NSString).deletingLastPathComponent
         }
         return nil
+    }
+
+    /// True when `path` is a kept project or lies inside one.
+    static func isKept(_ path: String, _ kept: Set<String>) -> Bool {
+        kept.contains { path == $0 || path.hasPrefix($0 + "/") }
     }
 
     static func ago(_ days: Int) -> String {

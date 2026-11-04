@@ -9,13 +9,16 @@ public struct ScanSettings: Codable, Equatable, Sendable {
     public var largeFileBytes: Int64
     /// Categories to scan. Empty means all.
     public var categories: Set<Category>
+    /// Project folders the user keeps: nothing inside them is offered.
+    public var keptProjects: [String]
 
     public init(projectRoots: [String], staleDays: Int = 60, largeFileBytes: Int64 = 500 * 1_000_000,
-                categories: Set<Category> = Set(Category.allCases)) {
+                categories: Set<Category> = Set(Category.allCases), keptProjects: [String] = []) {
         self.projectRoots = projectRoots
         self.staleDays = staleDays
         self.largeFileBytes = largeFileBytes
         self.categories = categories
+        self.keptProjects = keptProjects
     }
 
     /// The first of the usual project folders that exists.

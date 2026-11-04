@@ -156,6 +156,18 @@ final class AppModel: ObservableObject {
         }
     }
 
+    /// Keeps a project out of every future scan and drops its items now,
+    /// so the user sees the effect without waiting for a rescan.
+    func keep(project: String) {
+        settings.keep(project)
+        guard var current = result else { return }
+        let gone = Set(current.items.filter { $0.project == project }.map(\.id))
+        current.items.removeAll { gone.contains($0.id) }
+        result = current
+        selection.subtract(gone)
+        Telemetry.breadcrumb("project.kept")
+    }
+
     func selectDefaults() {
         selection = Set(result?.items.filter(\.selectedByDefault).map(\.id) ?? [])
     }

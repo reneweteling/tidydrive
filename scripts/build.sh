@@ -50,6 +50,11 @@ if [[ -f "$BUILD_DIR/AppIcon.icns" ]]; then
     echo "✓ AppIcon.icns copied into bundle"
 fi
 
+# Resources the app reads through Bundle.main, inside Contents/Resources so
+# code signing seals them (same approach as Loft).
+cp "$REPO_ROOT/Sources/TidyDrive/Resources/weteling-logo.svg" "$RES/weteling-logo.svg"
+echo "✓ weteling-logo.svg copied into Contents/Resources"
+
 SIGN_IDENTITY="${SIGN_IDENTITY:--}"
 if [[ "$SIGN_IDENTITY" == "-" ]]; then
     echo "→ Ad-hoc signing..."

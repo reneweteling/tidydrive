@@ -193,6 +193,13 @@ struct ItemRow: View {
                     .lineLimit(2).truncationMode(.middle)
             }
             Spacer(minLength: 12)
+            if let project = item.project {
+                Button { model.keep(project: project) } label: { Image(systemName: "pin") }
+                    .buttonStyle(.borderless)
+                    .foregroundStyle(.secondary)
+                    .help("Keep \((project as NSString).lastPathComponent): an active project, never offer its files for cleaning")
+                    .accessibilityLabel("Keep project \((project as NSString).lastPathComponent)")
+            }
             RiskPill(risk: item.risk)
             Text(ByteFormat.string(item.size))
                 .font(.system(size: 13)).monospacedDigit()
@@ -208,6 +215,10 @@ struct ItemRow: View {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(path, forType: .string)
                 }
+            }
+            if let project = item.project {
+                Divider()
+                Button("Keep \((project as NSString).lastPathComponent), never clean it") { model.keep(project: project) }
             }
             Text("Action: \(item.action.summary)")
         }

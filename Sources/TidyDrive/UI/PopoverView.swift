@@ -26,7 +26,7 @@ struct PopoverView: View {
 
     private var header: some View {
         HStack(spacing: 8) {
-            AppGlyph(size: 22)
+            AppIconView(size: 24)
             Text("TidyDrive").font(.system(size: 15, weight: .bold))
             Spacer()
             if let finished = model.result?.finishedAt, model.phase == .idle {
@@ -195,31 +195,62 @@ struct Banner<Content: View>: View {
     }
 }
 
-/// The gauge arc from the app icon, drawn in SwiftUI.
+/// The app icon, drawn in SwiftUI so it looks the same everywhere,
+/// including in the rendered screenshots. Mirrors scripts/make-icon.swift.
 struct AppGlyph: View {
     var size: CGFloat
 
     var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: size * 0.25).fill(Theme.ink)
-            GaugeArc(fraction: 1).stroke(Color.white.opacity(0.22), style: StrokeStyle(lineWidth: size * 0.12, lineCap: .round))
-                .padding(size * 0.2)
-            GaugeArc(fraction: 0.62).stroke(Theme.accent, style: StrokeStyle(lineWidth: size * 0.12, lineCap: .round))
-                .padding(size * 0.2)
+        Canvas { ctx, canvas in
+            let s = canvas.width
+            let rect = CGRect(x: 0, y: 0, width: s, height: s)
+            let shape = Path(roundedRect: rect, cornerRadius: s * 0.225, style: .continuous)
+            ctx.fill(shape, with: .linearGradient(
+                Gradient(colors: [Color(red: 0.11, green: 0.18, blue: 0.20), Color(red: 0.03, green: 0.055, blue: 0.063)]),
+                startPoint: .zero, endPoint: CGPoint(x: 0, y: s)))
+
+            // SwiftUI's y grows downwards; the dial centre sits 64% down.
+            let center = CGPoint(x: s / 2, y: s * 0.64)
+            let r = s * 0.33
+            let line = s * 0.11
+            if s >= 40 {
+                for i in 0...10 {
+                    let a = Double.pi + Double(i) / 10 * Double.pi
+                    let inner = r + s * 0.085, outer = r + s * (i % 5 == 0 ? 0.125 : 0.105)
+                    var tick = Path()
+                    tick.move(to: CGPoint(x: center.x + cos(a) * inner, y: center.y + sin(a) * inner))
+                    tick.addLine(to: CGPoint(x: center.x + cos(a) * outer, y: center.y + sin(a) * outer))
+                    ctx.stroke(tick, with: .color(.white.opacity(0.28)), style: StrokeStyle(lineWidth: max(1, s * 0.008), lineCap: .round))
+                }
+            }
+            var track = Path()
+            track.addArc(center: center, radius: r, startAngle: .degrees(180), endAngle: .degrees(360), clockwise: false)
+            ctx.stroke(track, with: .color(Color(red: 0.23, green: 0.29, blue: 0.30)), style: StrokeStyle(lineWidth: line, lineCap: .round))
+
+            let endAngle = 180 + 0.62 * 180
+            var value = Path()
+            value.addArc(center: center, radius: r, startAngle: .degrees(180), endAngle: .degrees(endAngle), clockwise: false)
+            ctx.stroke(value, with: .linearGradient(
+                Gradient(colors: [Color(red: 1, green: 0.48, blue: 0.32), Color(red: 0.91, green: 0.26, blue: 0.12)]),
+                startPoint: CGPoint(x: center.x - r, y: center.y), endPoint: CGPoint(x: center.x + r, y: center.y - r)),
+                style: StrokeStyle(lineWidth: line, lineCap: .round))
+
+            let a = endAngle * .pi / 180
+            var needle = Path()
+            needle.move(to: center)
+            needle.addLine(to: CGPoint(x: center.x + cos(a) * r * 0.72, y: center.y + sin(a) * r * 0.72))
+            ctx.stroke(needle, with: .color(Color(red: 0.95, green: 0.96, blue: 0.95)), style: StrokeStyle(lineWidth: s * 0.035, lineCap: .round))
+            let hub = s * 0.075
+            ctx.fill(Path(ellipseIn: CGRect(x: center.x - hub / 2, y: center.y - hub / 2, width: hub, height: hub)),
+                     with: .color(Color(red: 0.95, green: 0.96, blue: 0.95)))
+
+            let barW = s * 0.5, barH = s * 0.055
+            let bar = CGRect(x: s / 2 - barW / 2, y: s * 0.835 - barH, width: barW, height: barH)
+            ctx.fill(Path(roundedRect: bar, cornerRadius: barH / 2), with: .color(Color(red: 0.23, green: 0.29, blue: 0.30)))
+            ctx.fill(Path(roundedRect: CGRect(x: bar.minX, y: bar.minY, width: barW * 0.38, height: barH), cornerRadius: barH / 2),
+                     with: .color(Color(red: 0.37, green: 0.83, blue: 0.60)))
         }
         .frame(width: size, height: size)
-    }
-}
-
-struct GaugeArc: Shape {
-    var fraction: Double
-
-    func path(in rect: CGRect) -> Path {
-        var p = Path()
-        let center = CGPoint(x: rect.midX, y: rect.maxY - rect.height * 0.12)
-        let radius = min(rect.width / 2, rect.height * 0.85)
-        p.addArc(center: center, radius: radius, startAngle: .degrees(180),
-                 endAngle: .degrees(180 + 180 * fraction), clockwise: false)
-        return p
+        .accessibilityHidden(true)
     }
 }

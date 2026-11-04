@@ -37,6 +37,13 @@ enum AssetRenderer {
             snapshot(NotificationMock(), size: nil, appearance: appearance, to: dir.appendingPathComponent("notification\(suffix).png"))
         }
 
+        if args(contains: "--about") {
+            snapshot(AboutView(updates: UpdateChecker.shared), size: NSSize(width: 540, height: 640), appearance: .darkAqua,
+                     to: dir.appendingPathComponent("about.png"))
+            snapshot(SettingsView(settings: settings, updates: UpdateChecker.shared), size: NSSize(width: 540, height: 520),
+                     appearance: .darkAqua, to: dir.appendingPathComponent("settings.png"))
+        }
+
         guard demo else { return }
         // Demo states for the video, dark only.
         let frames = dir.appendingPathComponent("states", isDirectory: true)
@@ -71,6 +78,8 @@ enum AssetRenderer {
         model.focusedCategory = .projects
         snapshot(ReviewView(model: model), size: NSSize(width: 980, height: 620), appearance: .darkAqua, to: frames.appendingPathComponent("review-projects.png"))
     }
+
+    private static func args(contains flag: String) -> Bool { CommandLine.arguments.contains(flag) }
 
     private static func popover(_ model: AppModel, _ settings: AppSettings) -> some View {
         PopoverView(model: model, settings: settings, openReview: { _ in }, openSettings: {}, quit: {})
@@ -134,8 +143,10 @@ enum Sample {
 
     static func item(_ category: Category, _ group: String, _ title: String, _ detail: String, _ size: Int64,
                      _ risk: Risk, _ selected: Bool) -> CleanupItem {
-        CleanupItem(id: "\(category.rawValue):\(title)", category: category, group: group, title: title, detail: detail,
-                    path: nil, size: size, risk: risk, selectedByDefault: selected, action: .delete([]))
+        let project = [.projects, .largeFiles].contains(category)
+            ? "/Users/you/projects/" + (title.split(separator: "/").first.map(String.init) ?? title) : nil
+        return CleanupItem(id: "\(category.rawValue):\(title)", category: category, group: group, title: title, detail: detail,
+                           path: nil, size: size, risk: risk, selectedByDefault: selected, action: .delete([]), project: project)
     }
 
     static let items: [CleanupItem] = [

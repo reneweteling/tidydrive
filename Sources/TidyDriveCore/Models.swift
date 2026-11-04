@@ -128,9 +128,13 @@ public struct CleanupItem: Codable, Hashable, Sendable, Identifiable {
     public var risk: Risk
     public var selectedByDefault: Bool
     public var action: CleanupAction
+    /// The project folder this item belongs to, for projects and large
+    /// files. Lets the user keep a whole project out of future scans.
+    public var project: String?
 
     public init(id: String, category: Category, group: String, title: String, detail: String,
-                path: String?, size: Int64, risk: Risk, selectedByDefault: Bool, action: CleanupAction) {
+                path: String?, size: Int64, risk: Risk, selectedByDefault: Bool, action: CleanupAction,
+                project: String? = nil) {
         self.id = id
         self.category = category
         self.group = group
@@ -142,6 +146,7 @@ public struct CleanupItem: Codable, Hashable, Sendable, Identifiable {
         // Careful items are never preselected, whatever a scanner asks for.
         self.selectedByDefault = risk == .careful ? false : selectedByDefault
         self.action = action
+        self.project = project
     }
 }
 

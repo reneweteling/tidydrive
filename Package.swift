@@ -27,7 +27,7 @@ let package = Package(
             ],
             path: "Sources/TidyDrive",
             // Info.plist and the icon are placed by build.sh, not by SwiftPM.
-            exclude: ["Resources/Info.plist"]
+            exclude: ["Resources/Info.plist", "Resources/weteling-logo.svg"]
         ),
         .testTarget(
             name: "TidyDriveCoreTests",
