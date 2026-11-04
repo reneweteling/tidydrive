@@ -61,5 +61,16 @@ public enum PhotoEncoder {
     public static func verify(original: URL, converted: URL) throws {
         guard let a = probe(original), let b = probe(converted) else { throw PhotoEncoderError.verifyFailed("unreadable") }
         guard a.width == b.width, a.height == b.height else { throw PhotoEncoderError.verifyFailed("size changed") }
+        // A logo or screenshot with transparency must stay transparent.
+        if hasAlpha(original), !hasAlpha(converted) { throw PhotoEncoderError.verifyFailed("transparency was lost") }
+    }
+
+    /// Whether the image carries a transparent layer.
+    public static func hasAlpha(_ url: URL) -> Bool {
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any] else { return false }
+        if let flag = props[kCGImagePropertyHasAlpha] as? Bool { return flag }
+        guard let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else { return false }
+        return ![.none, .noneSkipFirst, .noneSkipLast].contains(image.alphaInfo)
     }
 }

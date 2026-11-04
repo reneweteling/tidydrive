@@ -319,3 +319,37 @@ final class ConversionTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: source.path))
     }
 }
+
+
+final class TransparencyTests: XCTestCase {
+    func testTransparentPNGKeepsItsAlphaAsHEIC() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("tidydrive-alpha-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let png = dir.appendingPathComponent("logo.png"), heic = dir.appendingPathComponent("logo.heic")
+
+        // Transparent canvas with an opaque red square in the middle.
+        let ctx = CGContext(data: nil, width: 400, height: 400, bitsPerComponent: 8, bytesPerRow: 0,
+                            space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        ctx.clear(CGRect(x: 0, y: 0, width: 400, height: 400))
+        ctx.setFillColor(CGColor(srgbRed: 1, green: 0, blue: 0, alpha: 1))
+        ctx.fill(CGRect(x: 100, y: 100, width: 200, height: 200))
+        let dest = CGImageDestinationCreateWithURL(png as CFURL, UTType.png.identifier as CFString, 1, nil)!
+        CGImageDestinationAddImage(dest, ctx.makeImage()!, nil)
+        CGImageDestinationFinalize(dest)
+
+        try PhotoEncoder.encode(source: png, output: heic)
+        try PhotoEncoder.verify(original: png, converted: heic)
+        XCTAssertTrue(PhotoEncoder.hasAlpha(heic), "HEIC lost the transparent layer")
+
+        // The corner must still be see-through, the centre opaque.
+        let image = CGImageSourceCreateImageAtIndex(CGImageSourceCreateWithURL(heic as CFURL, nil)!, 0, nil)!
+        let out = CGContext(data: nil, width: 400, height: 400, bitsPerComponent: 8, bytesPerRow: 1600,
+                            space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        out.clear(CGRect(x: 0, y: 0, width: 400, height: 400))
+        out.draw(image, in: CGRect(x: 0, y: 0, width: 400, height: 400))
+        let px = out.data!.assumingMemoryBound(to: UInt8.self)
+        XCTAssertLessThan(px[3], 10, "corner should be transparent")
+        XCTAssertGreaterThan(px[(200 * 400 + 200) * 4 + 3], 245, "centre should be opaque")
+    }
+}

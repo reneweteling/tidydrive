@@ -78,7 +78,8 @@ public struct PhotoScanner: Scanner {
             items.append(CleanupItem(
                 id: "photo:\(path)", category: .photos, group: context.tilde((path as NSString).deletingLastPathComponent),
                 title: (path as NSString).lastPathComponent,
-                detail: "\(info.format.uppercased()) \(info.width)×\(info.height) · \(ByteFormat.string(size)) → about \(ByteFormat.string(estimate)) HEIC",
+                detail: "\(info.format.uppercased()) \(info.width)×\(info.height)\(PhotoEncoder.hasAlpha(url) ? ", transparent" : "") · "
+                    + "\(ByteFormat.string(size)) → about \(ByteFormat.string(estimate)) HEIC",
                 path: path, size: size - estimate, risk: .careful, selectedByDefault: false,
                 action: .convert(MediaConversion(kind: .photo, source: path, originalSize: size, estimatedSize: estimate))
             ))
