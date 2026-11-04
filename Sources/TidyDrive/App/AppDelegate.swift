@@ -17,6 +17,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
+        installMainMenu()
         Telemetry.startIfEnabled()
         Telemetry.breadcrumb("app.launched")
 
@@ -118,13 +119,61 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
         }
     }
 
+    // MARK: - Main menu
+
+    /// The menu bar shows while a window is open (the app is `.regular` then),
+    /// so it needs the usual items: Settings on ⌘, and the shortcuts people
+    /// expect for closing, hiding and quitting.
+    private func installMainMenu() {
+        let main = NSMenu()
+
+        let appMenu = NSMenu()
+        appMenu.addItem(withTitle: "Settings…", action: #selector(menuShowSettings), keyEquivalent: ",").target = self
+        appMenu.addItem(.separator())
+        appMenu.addItem(withTitle: "Review", action: #selector(menuShowReview), keyEquivalent: "1").target = self
+        appMenu.addItem(withTitle: "Disk Map", action: #selector(menuShowDiskMap), keyEquivalent: "2").target = self
+        appMenu.addItem(.separator())
+        appMenu.addItem(withTitle: "Hide TidyDrive", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
+        appMenu.addItem(withTitle: "Quit TidyDrive", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        main.addItem(submenu: appMenu, title: "TidyDrive")
+
+        let editMenu = NSMenu(title: "Edit")
+        editMenu.addItem(withTitle: "Undo", action: Selector(("undo:")), keyEquivalent: "z")
+        editMenu.addItem(withTitle: "Redo", action: Selector(("redo:")), keyEquivalent: "Z")
+        editMenu.addItem(.separator())
+        editMenu.addItem(withTitle: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        editMenu.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        editMenu.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        editMenu.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        main.addItem(submenu: editMenu, title: "Edit")
+
+        let windowMenu = NSMenu(title: "Window")
+        windowMenu.addItem(withTitle: "Review", action: #selector(menuShowReview), keyEquivalent: "").target = self
+        windowMenu.addItem(withTitle: "Disk Map", action: #selector(menuShowDiskMap), keyEquivalent: "").target = self
+        windowMenu.addItem(.separator())
+        windowMenu.addItem(withTitle: "Minimize", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
+        windowMenu.addItem(withTitle: "Close", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
+        main.addItem(submenu: windowMenu, title: "Window")
+
+        NSApp.mainMenu = main
+        NSApp.windowsMenu = windowMenu
+    }
+
+    @objc private func menuShowSettings() { showSettings() }
+    @objc private func menuShowReview() { showReview(nil) }
+    @objc private func menuShowDiskMap() { showDiskMap() }
+
     // MARK: - Windows
 
     func showReview(_ category: Category?) {
         popover.performClose(nil)
         model.focusedCategory = category
         if reviewWindow == nil {
-            let window = NSWindow(contentViewController: NSHostingController(rootView: ReviewView(model: model)))
+            let window = NSWindow(contentViewController: NSHostingController(rootView: ReviewView(
+                model: model,
+                openSettings: { [weak self] in self?.showSettings() },
+                openDiskMap: { [weak self] in self?.showDiskMap() }
+            )))
             window.title = "TidyDrive"
             window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
             window.setContentSize(NSSize(width: 980, height: 640))
@@ -170,9 +219,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
     private func present(_ window: NSWindow) {
         // A menu bar app has no Dock icon; switch to a regular app while a
         // window is open so it can come to the front and take keyboard focus.
+        let wasAccessory = NSApp.activationPolicy() != .regular
         NSApp.setActivationPolicy(.regular)
         window.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
+        guard wasAccessory,
+              let dock = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.dock").first
+        else {
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
+        // AppKit quirk: right after switching from .accessory to .regular the
+        // menu bar stays on the previous app. Handing focus to the Dock and
+        // then taking it back makes macOS show our menu bar.
+        dock.activate(options: [])
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            NSApp.activate(ignoringOtherApps: true)
+            window.makeKeyAndOrderFront(nil)
+        }
     }
 
     func windowWillClose(_ notification: Notification) {
@@ -184,5 +247,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
             // New project folders or categories should show up right away.
             Task { await model.scan() }
         }
+    }
+}
+
+private extension NSMenu {
+    func addItem(submenu: NSMenu, title: String) {
+        let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+        item.submenu = submenu
+        addItem(item)
     }
 }

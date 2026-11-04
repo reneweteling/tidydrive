@@ -4,6 +4,8 @@ import TidyDriveCore
 
 struct ReviewView: View {
     @ObservedObject var model: AppModel
+    var openSettings: () -> Void = {}
+    var openDiskMap: () -> Void = {}
     @State private var category: Category?
     @State private var confirming = false
 
@@ -65,6 +67,14 @@ struct ReviewView: View {
                 .onTapGesture { category = c }
             }
             Spacer()
+            HStack(spacing: 14) {
+                Button("Disk Map", action: openDiskMap)
+                Button("Settings…", action: openSettings)
+            }
+            .buttonStyle(.plain)
+            .font(.system(size: 12))
+            .foregroundStyle(.secondary)
+            .padding(.bottom, 8)
             if let result = model.result {
                 Text("Scanned \(result.finishedAt.formatted(date: .omitted, time: .shortened)) in \(Int(result.duration))s")
                     .font(.system(size: 11)).foregroundStyle(.secondary)
