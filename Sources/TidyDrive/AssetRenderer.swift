@@ -44,6 +44,8 @@ enum AssetRenderer {
             model.focusedCategory = .videos
             snapshot(ReviewView(model: model), size: NSSize(width: 980, height: 620), appearance: .darkAqua,
                      to: dir.appendingPathComponent("videos.png"))
+            snapshot(ConfirmSheet(model: model, isPresented: .constant(true)), size: nil, appearance: .darkAqua,
+                     to: dir.appendingPathComponent("confirm.png"))
             snapshot(AboutView(updates: UpdateChecker.shared), size: NSSize(width: 540, height: 640), appearance: .darkAqua,
                      to: dir.appendingPathComponent("about.png"))
             snapshot(SettingsView(settings: settings, updates: UpdateChecker.shared), size: NSSize(width: 540, height: 520),

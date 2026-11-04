@@ -396,51 +396,138 @@ struct ConfirmSheet: View {
     @ObservedObject var model: AppModel
     @Binding var isPresented: Bool
 
+    /// What happens to an item, in words, grouped for the totals.
+    enum Outcome: Int, CaseIterable {
+        case deleted, trashed, command, converted
+        var title: String {
+            switch self {
+            case .deleted: return "Deleted right away"
+            case .trashed: return "Moved to the Trash, you can put it back"
+            case .command: return "Removed by the tool's own command"
+            case .converted: return "Converted, original to the Trash"
+            }
+        }
+        var symbol: String {
+            switch self {
+            case .deleted: return "xmark.bin"
+            case .trashed: return "trash"
+            case .command: return "terminal"
+            case .converted: return "arrow.triangle.2.circlepath"
+            }
+        }
+    }
+
+    static func outcome(_ item: CleanupItem) -> Outcome {
+        switch item.action {
+        case .delete, .manual: return .deleted
+        case .trash: return .trashed
+        case .commands: return .command
+        case .convert: return .converted
+        }
+    }
+
+    static func what(_ item: CleanupItem) -> String {
+        switch item.action {
+        case .delete(let paths): return paths.count > 1 ? "delete \(paths.count) folders" : "delete"
+        case .trash(let paths): return paths.count > 1 ? "\(paths.count) items to the Trash" : "to the Trash"
+        case .commands(let commands, _):
+            let first = commands.first.map { cmd in
+                ([(cmd.executable as NSString).lastPathComponent] + cmd.arguments.filter { !$0.hasPrefix("/") && $0 != "-C" }.prefix(3)).joined(separator: " ")
+            } ?? "command"
+            return commands.count > 1 ? "\(first) + \(commands.count - 1) more" : first
+        case .convert(let c): return "convert to .\(c.targetExtension)"
+        case .manual: return "manual"
+        }
+    }
+
     var body: some View {
-        let items = model.selectedItems
+        let items = model.selectedItems.filter { !$0.isManual }
         let careful = items.filter { $0.risk == .careful }
-        let trash = items.filter { if case .trash = $0.action { return true } else { return false } }
+        let byCategory = Dictionary(grouping: items, by: \.category)
+            .sorted { $0.value.reduce(0) { $0 + $1.size } > $1.value.reduce(0) { $0 + $1.size } }
+        let unapproved = model.unapprovedConversions
 
         VStack(alignment: .leading, spacing: 14) {
-            Text("Clean \(ByteFormat.string(model.selectedSize))?").font(.system(size: 18, weight: .bold))
-            VStack(alignment: .leading, spacing: 6) {
-                ForEach(Risk.allCases, id: \.self) { risk in
-                    let list = items.filter { $0.risk == risk }
-                    if !list.isEmpty {
-                        HStack {
-                            RiskPill(risk: risk)
-                            Text("\(list.count) item\(list.count == 1 ? "" : "s")")
-                            Spacer()
-                            Text(ByteFormat.string(list.reduce(0) { $0 + $1.size })).monospacedDigit()
-                        }
-                    }
-                }
-            }
-            if !careful.isEmpty {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("These may hold data that does not come back:").font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Theme.riskColor(.careful))
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 2) {
-                            ForEach(careful) { Text("• \($0.title)").font(.system(size: 12, design: .monospaced)) }
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    .frame(maxHeight: 120)
-                }
-            }
-            let conversions = items.filter { $0.category.isConversion }.count
-            if conversions > 0 {
-                Text("\(conversions) file\(conversions == 1 ? " is" : "s are") converted. Each new file is saved next to the original under the same name, and the original goes to the Trash.")
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Clean \(ByteFormat.string(model.selectedSize))?").font(.system(size: 20, weight: .bold))
+                Text("\(items.count) item\(items.count == 1 ? "" : "s") in \(byCategory.count) categor\(byCategory.count == 1 ? "y" : "ies"). Nothing is removed until you click Clean.")
                     .font(.system(size: 12)).foregroundStyle(.secondary)
+            }
+
+            // What happens, in totals.
+            VStack(spacing: 6) {
+                ForEach(Outcome.allCases, id: \.self) { outcome in
+                    let list = items.filter { Self.outcome($0) == outcome }
+                    if !list.isEmpty {
+                        HStack(spacing: 8) {
+                            Image(systemName: outcome.symbol).frame(width: 18).foregroundStyle(.secondary)
+                            Text(outcome.title)
+                            Spacer()
+                            Text("\(list.count)").monospacedDigit().foregroundStyle(.secondary)
+                            Text(ByteFormat.string(list.reduce(0) { $0 + $1.size })).monospacedDigit().frame(width: 80, alignment: .trailing)
+                        }
+                        .font(.system(size: 12))
+                    }
+                }
+                HStack(spacing: 6) {
+                    ForEach(Risk.allCases, id: \.self) { risk in
+                        let n = items.filter { $0.risk == risk }.count
+                        if n > 0 { RiskPill(risk: risk); Text("\(n)").font(.system(size: 11)).foregroundStyle(.secondary).padding(.trailing, 6) }
+                    }
+                    Spacer()
+                }
+                .padding(.top, 2)
+            }
+            .padding(12)
+            .background(RoundedRectangle(cornerRadius: 8).fill(.background.secondary))
+
+            // Every item, per category.
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 0, pinnedViews: [.sectionHeaders]) {
+                    ForEach(byCategory, id: \.key) { category, list in
+                        Section {
+                            ForEach(list.sorted { $0.size > $1.size }) { item in
+                                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                    VStack(alignment: .leading, spacing: 1) {
+                                        Text(item.title).font(.system(size: 12)).lineLimit(1).truncationMode(.middle)
+                                        if let path = item.path {
+                                            Text((path as NSString).abbreviatingWithTildeInPath)
+                                                .font(.system(size: 10, design: .monospaced)).foregroundStyle(.secondary)
+                                                .lineLimit(1).truncationMode(.middle)
+                                        }
+                                    }
+                                    Spacer(minLength: 8)
+                                    Text(Self.what(item)).font(.system(size: 10, design: .monospaced))
+                                        .foregroundStyle(item.risk == .careful ? Theme.riskColor(.careful) : .secondary).lineLimit(1)
+                                    Text(ByteFormat.string(item.size)).font(.system(size: 11)).monospacedDigit()
+                                        .frame(width: 70, alignment: .trailing)
+                                }
+                                .padding(.vertical, 5).padding(.horizontal, 4)
+                                Divider().opacity(0.5)
+                            }
+                        } header: {
+                            HStack(spacing: 6) {
+                                Image(systemName: category.symbol).frame(width: 16)
+                                Text(category.title)
+                                Text("· \(list.count)").foregroundStyle(.secondary)
+                                Spacer()
+                                Text(ByteFormat.string(list.reduce(0) { $0 + $1.size })).monospacedDigit()
+                            }
+                            .font(.system(size: 12, weight: .semibold))
+                            .padding(.vertical, 6).padding(.horizontal, 4)
+                            .background(.background)
+                        }
+                    }
+                }
+            }
+            .frame(minHeight: 160, maxHeight: 320)
+
+            if !careful.isEmpty {
+                Label("\(careful.count) Careful item\(careful.count == 1 ? " holds" : "s hold") data that does not come back. Check them in red above.",
+                      systemImage: "exclamationmark.triangle")
+                    .font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.riskColor(.careful))
                     .fixedSize(horizontal: false, vertical: true)
             }
-            Text(trash.isEmpty
-                 ? "Everything selected is deleted right away. Caches and dependencies come back when your tools need them."
-                 : "\(trash.count) item\(trash.count == 1 ? " goes" : "s go") to the Trash. Everything else is deleted right away.")
-                .font(.system(size: 12)).foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            let unapproved = model.unapprovedConversions
             if !unapproved.isEmpty {
                 Label("Test the quality first: open \(unapproved.map { $0 == .video ? "Videos to shrink" : "Photos to shrink" }.joined(separator: " and ")) and click Test on one. Or deselect those items.",
                       systemImage: "eye")
@@ -451,7 +538,7 @@ struct ConfirmSheet: View {
             HStack {
                 Spacer()
                 Button("Cancel") { isPresented = false }.keyboardShortcut(.cancelAction)
-                Button("Clean") {
+                Button("Clean \(ByteFormat.string(model.selectedSize))") {
                     isPresented = false
                     Task { await model.clean() }
                 }
@@ -461,6 +548,6 @@ struct ConfirmSheet: View {
             }
         }
         .padding(22)
-        .frame(width: 420)
+        .frame(width: 640)
     }
 }
