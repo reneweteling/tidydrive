@@ -53,7 +53,7 @@ After cleaning, TidyDrive reports the free space measured on the volume, not the
 
 ## Install
 
-Download `TidyDrive.zip` from the [latest release](https://github.com/reneweteling/tidydrive/releases/latest), unzip, and drag `TidyDrive.app` to `/Applications`. Releases are signed with an Apple Developer ID and notarized.
+Download `TidyDrive.dmg` from the [latest release](https://github.com/reneweteling/tidydrive/releases/latest), open it, and drag TidyDrive onto the Applications folder. Releases are signed with an Apple Developer ID and notarized.
 
 Or build from source:
 
@@ -86,10 +86,11 @@ Crash reports go to Sentry with the app version and category names. No file name
 |---|---|
 | `swift test` | Core tests: safety guard, rules, version matching, Docker parsing, cleaner |
 | `./scripts/build.sh` | Builds and ad-hoc signs `build/TidyDrive.app` |
+| `./scripts/make-dmg.sh` | Wraps the app in `build/TidyDrive.dmg` with an Applications shortcut |
 | `.build/debug/TidyDrive --render-assets build/assets --demo` | Renders the screenshots with example data |
 | `swift scripts/make-demo.swift build/assets docs/public/assets/demo.mp4` | Builds the demo video (needs ffmpeg) |
 
-Releases run on every push to `main`: semantic-release picks the version from Conventional Commits, the macOS job tests, builds, signs, notarizes and attaches `TidyDrive.zip` to the GitHub release. The site in `docs/` deploys to GitHub Pages.
+Releases run on every push to `main`: semantic-release picks the version from Conventional Commits, the macOS job tests, builds, signs, notarizes and attaches a notarized `TidyDrive.dmg` to the GitHub release. The site in `docs/` deploys to GitHub Pages.
 
 ## Made by
 

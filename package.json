@@ -33,8 +33,8 @@
         {
           "assets": [
             {
-              "path": "build/TidyDrive.zip",
-              "label": "TidyDrive v${nextRelease.version} — macOS (Apple Silicon)"
+              "path": "build/TidyDrive.dmg",
+              "label": "TidyDrive v${nextRelease.version} for macOS (Apple Silicon)"
             }
           ]
         }

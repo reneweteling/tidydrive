@@ -133,13 +133,9 @@ jobs:
           SIGN_IDENTITY: ${{ env.HAS_SIGNING == 'true' && 'Developer ID Application' || '-' }}
         run: ./scripts/build.sh
 
-      - name: Zip app bundle
-        shell: bash
-        run: |
-          ditto -c -k --sequesterRsrc --keepParent build/TidyDrive.app build/TidyDrive.zip
-          echo "Archive size: $(du -sh build/TidyDrive.zip | cut -f1)"
-
-      - name: Notarize and staple
+      # Notarize the app itself first and staple the ticket to it, so the
+      # app keeps working offline once it is copied out of the disk image.
+      - name: Notarize and staple the app
         if: ${{ env.HAS_SIGNING == 'true' }}
         shell: bash
         env:
@@ -147,21 +143,36 @@ jobs:
           APPLE_TEAM_ID: ND82KXRD2Q
           APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
         run: |
-          xcrun notarytool submit build/TidyDrive.zip \
-            --apple-id "$APPLE_ID" \
-            --team-id "$APPLE_TEAM_ID" \
-            --password "$APPLE_APP_PASSWORD" \
-            --wait
+          ditto -c -k --sequesterRsrc --keepParent build/TidyDrive.app "$RUNNER_TEMP/notarize.zip"
+          xcrun notarytool submit "$RUNNER_TEMP/notarize.zip" \
+            --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_APP_PASSWORD" --wait
           xcrun stapler staple build/TidyDrive.app
-          rm build/TidyDrive.zip
-          ditto -c -k --sequesterRsrc --keepParent build/TidyDrive.app build/TidyDrive.zip
-          echo "Notarized archive size: $(du -sh build/TidyDrive.zip | cut -f1)"
+          rm -f "$RUNNER_TEMP/notarize.zip"
+
+      - name: Build disk image
+        shell: bash
+        env:
+          SIGN_IDENTITY: ${{ env.HAS_SIGNING == 'true' && 'Developer ID Application' || '-' }}
+        run: ./scripts/make-dmg.sh
+
+      - name: Notarize and staple the disk image
+        if: ${{ env.HAS_SIGNING == 'true' }}
+        shell: bash
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ND82KXRD2Q
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: |
+          xcrun notarytool submit build/TidyDrive.dmg \
+            --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_APP_PASSWORD" --wait
+          xcrun stapler staple build/TidyDrive.dmg
+          echo "Disk image size: $(du -sh build/TidyDrive.dmg | cut -f1)"
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v7
         with:
           name: tidydrive-macos-v${{ needs.version.outputs.version }}
-          path: build/TidyDrive.zip
+          path: build/TidyDrive.dmg
           retention-days: 1
 
   release:
