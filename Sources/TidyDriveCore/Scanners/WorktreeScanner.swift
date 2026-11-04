@@ -72,16 +72,27 @@ public struct WorktreeScanner: Scanner {
             var args = ["-C", repo, "worktree", "remove"]
             if dirty { args.append("--force") }
             args.append(wt.path)
+            var commands = [Command("git", args)]
+            // A merged branch has nothing left to keep; -d refuses anything
+            // that is not merged, so no commit can go missing.
+            if isMerged, !risky, let branch = wt.branch {
+                // Best effort: -d also refuses when the local base branch is
+                // behind origin; then the branch simply stays.
+                commands.append(Command("/bin/sh", ["-c", "git -C \"$0\" branch -d \"$1\" >/dev/null 2>&1 || true", repo, branch]))
+                detail = detail.replacingOccurrences(of: " · the branch and its commits stay", with: " · its merged branch is deleted too")
+            }
             let repoName = (repo as NSString).lastPathComponent
             let item = CleanupItem(
                 id: "worktree:\(wt.path)", category: .worktrees, group: repoName,
                 title: Self.label(wt.path, repo: repo), detail: detail, path: wt.path, size: sizes[wt.path] ?? 0,
                 risk: risky ? .careful : .rebuild, selectedByDefault: !risky && (isMerged || stale),
-                action: .commands([Command("git", args)], fallbackDelete: []),
+                action: .commands(commands, fallbackDelete: []),
                 project: repo
             )
             lock.lock(); items.append(item); lock.unlock()
         }
+
+        items += repos.compactMap { Self.housekeeping($0, context: context, kept: kept) }
 
         var notes: [ScanNote] = []
         if !items.isEmpty {
@@ -91,6 +102,31 @@ public struct WorktreeScanner: Scanner {
             }
         }
         return (items, notes)
+    }
+
+    /// Loose objects and garbage in .git that `git gc` packs or removes.
+    /// Branches themselves take no space; this is where git's space goes.
+    static func housekeeping(_ repo: String, context: ScanContext, kept: Set<String>) -> CleanupItem? {
+        guard !ProjectScanner.isKept(repo, kept) else { return nil }
+        let out = context.shell.run("git", ["-C", repo, "count-objects", "-v"], timeout: 30)
+        guard out.succeeded else { return nil }
+        var v: [String: Int64] = [:]
+        for line in out.stdout.split(whereSeparator: \.isNewline) {
+            let parts = line.split(separator: ":").map { $0.trimmingCharacters(in: .whitespaces) }
+            if parts.count == 2, let n = Int64(parts[1]) { v[parts[0]] = n }
+        }
+        let loose = (v["size"] ?? 0) * 1024, garbage = (v["size-garbage"] ?? 0) * 1024, packs = v["packs"] ?? 0
+        // Packing shrinks loose objects to roughly a third; garbage goes entirely.
+        let saving = loose * 2 / 3 + garbage
+        guard saving >= 50_000_000 else { return nil }
+        let name = (repo as NSString).lastPathComponent
+        return CleanupItem(
+            id: "git-gc:\(repo)", category: .worktrees, group: "Repository housekeeping",
+            title: "\(name): pack loose objects",
+            detail: "\(ByteFormat.string(loose)) in loose objects, \(packs) packs\(garbage > 0 ? ", \(ByteFormat.string(garbage)) garbage" : "") · git gc, nothing reachable is removed",
+            path: "\(repo)/.git", size: saving, risk: .safe, selectedByDefault: true,
+            action: .commands([Command("git", ["-C", repo, "gc", "--quiet"])], fallbackDelete: []), project: repo
+        )
     }
 
     /// "collabcenter: .claude/worktrees/agent-1234" or "cc-trial-1560".

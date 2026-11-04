@@ -22,10 +22,12 @@ public struct SafetyGuard: Sendable {
         let path = SafetyGuard.normalize(rawPath)
         if path.split(separator: "/").contains("..") { return .refused("path contains ..") }
 
-        // Xcode apps are the only thing outside the home folder we touch,
-        // and only by moving them to the Trash.
-        if forTrash, path.hasPrefix("/Applications/Xcode"), path.hasSuffix(".app") {
-            return .allowed
+        // Apps themselves, only to the Trash and only a whole bundle at the top
+        // of /Applications or ~/Applications (Safari belongs to macOS).
+        if forTrash, path.hasSuffix(".app"), !path.hasSuffix("/Safari.app") {
+            for base in ["/Applications/", home + "/Applications/"] where path.hasPrefix(base) {
+                if !path.dropFirst(base.count).contains("/") { return .allowed }
+            }
         }
 
         guard path.hasPrefix(home + "/") else { return .refused("outside the home folder") }

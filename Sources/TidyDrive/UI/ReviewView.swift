@@ -147,7 +147,7 @@ struct CategoryDetail: View {
                     .font(.system(size: 15)).foregroundStyle(.secondary).monospacedDigit()
                 Spacer()
                 if category.isConversion || category == .duplicates {
-                    Button("Select all") { model.selection.formUnion(items.map(\.id)) }
+                    Button("Select all") { model.selection.formUnion(items.filter { !$0.isManual }.map(\.id)) }
                 } else {
                     Button("Select safe") {
                         model.selection.formUnion(items.filter { $0.risk == .safe }.map(\.id))
@@ -316,7 +316,14 @@ struct ItemRow: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            CheckBox(state: model.selection.contains(item.id) ? .on : .off) { model.toggle(item) }
+            if case .manual(_, let target) = item.action {
+                Button("Open") { if let target { AppModel.open(target) } }
+                    .controlSize(.small)
+                    .disabled(target == nil)
+                    .help(item.action.summary)
+            } else {
+                CheckBox(state: model.selection.contains(item.id) ? .on : .off) { model.toggle(item) }
+            }
             VStack(alignment: .leading, spacing: 2) {
                 Text(titleOverride ?? item.title).font(.system(size: 13, weight: .medium)).lineLimit(1).truncationMode(.middle)
                 Text(item.detail).font(.system(size: 11, design: .monospaced)).foregroundStyle(.secondary)

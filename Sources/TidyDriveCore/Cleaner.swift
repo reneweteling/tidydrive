@@ -112,6 +112,8 @@ public final class Cleaner: Sendable {
             return CleanupOutcome(item: item, succeeded: true, message: nil)
         case .convert:
             return CleanupOutcome(item: item, succeeded: false, message: "Conversions run through convert()")
+        case .manual(let instructions, _):
+            return CleanupOutcome(item: item, succeeded: false, message: instructions)
         }
     }
 

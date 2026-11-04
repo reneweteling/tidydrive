@@ -1,4 +1,5 @@
 import Foundation
+import AppKit
 import Combine
 import TidyDriveCore
 
@@ -127,19 +128,22 @@ final class AppModel: ObservableObject {
     }
 
     func checkState(for category: Category) -> CheckState {
-        let ids = items(in: category).map(\.id)
+        let ids = items(in: category).filter { !$0.isManual }.map(\.id)
         let chosen = ids.filter(selection.contains).count
         if chosen == 0 { return .off }
         return chosen == ids.count ? .on : .mixed
     }
 
     func checkState(for items: [CleanupItem]) -> CheckState {
+        let items = items.filter { !$0.isManual }
+        guard !items.isEmpty else { return .off }
         let chosen = items.filter { selection.contains($0.id) }.count
         if chosen == 0 { return .off }
         return chosen == items.count ? .on : .mixed
     }
 
     func toggle(_ item: CleanupItem) {
+        guard !item.isManual else { return }
         if selection.contains(item.id) { selection.remove(item.id) } else { selection.insert(item.id) }
     }
 
@@ -150,6 +154,7 @@ final class AppModel: ObservableObject {
     }
 
     func toggle(items: [CleanupItem]) {
+        let items = items.filter { !$0.isManual }
         let ids = items.map(\.id)
         if checkState(for: items) == .off {
             let safe = items.filter { $0.risk != .careful }.map(\.id)
@@ -183,10 +188,14 @@ final class AppModel: ObservableObject {
         phase = .cleaning(done: 0, total: items.count, current: items[0].title)
         Telemetry.breadcrumb("clean.started", data: ["items": items.count])
 
+        // Apps (and their data) can only go while they are not running.
+        let blocked = items.filter { item in item.quitApp.map(Self.isRunning) ?? false }
+        let runnable = items.filter { item in !blocked.contains { $0.id == item.id } }
+
         let guardrail = SafetyGuard(home: home, projectRoots: settings.projectRoots.map { expandHome($0) })
         let cleaner = Cleaner(shell: Shell(resolver: resolver), guardrail: guardrail)
         let current = CurrentItem()
-        let report = await cleaner.clean(items, progress: { item, done, total in
+        var report = await cleaner.clean(runnable, progress: { item, done, total in
             current.set(item.title, done, total)
             Task { @MainActor in self.phase = .cleaning(done: done, total: total, current: item.title) }
         }, conversionProgress: { fraction in
@@ -195,6 +204,7 @@ final class AppModel: ObservableObject {
                 self.phase = .cleaning(done: done, total: total, current: "\(title), \(Int(fraction * 100))%")
             }
         }, videoQuality: settings.videoQuality)
+        report.outcomes += blocked.map { CleanupOutcome(item: $0, succeeded: false, message: "Quit \($0.title.components(separatedBy: " caches").first ?? $0.title) first, then clean again") }
         trashedOriginals += report.trashedOriginals
         trashedOriginalsBytes += report.trashedBytes
         lastReport = report
@@ -217,6 +227,22 @@ final class AppModel: ObservableObject {
     }
 
     func dismissReport() { lastReport = nil }
+
+    /// `app` is a bundle id ("com.docker.docker") or an app name ("Slack").
+    static func isRunning(_ app: String) -> Bool {
+        NSWorkspace.shared.runningApplications.contains {
+            $0.bundleIdentifier == app || $0.localizedName == app
+        }
+    }
+
+    /// Opens an app by bundle id, or a URL such as System Settings.
+    static func open(_ target: String) {
+        if target.contains(":"), let url = URL(string: target) {
+            NSWorkspace.shared.open(url)
+        } else if let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: target) {
+            NSWorkspace.shared.openApplication(at: app, configuration: NSWorkspace.OpenConfiguration())
+        }
+    }
 
     /// Deletes only the originals TidyDrive moved to the Trash, nothing else
     /// that is in there.
@@ -289,6 +315,7 @@ extension CleanupAction {
         case .delete: return "delete"
         case .trash: return "trash"
         case .convert(let c): return "convert-\(c.kind.rawValue)"
+        case .manual: return "manual"
         case .commands(let commands, _): return commands.first?.executable ?? "command"
         }
     }

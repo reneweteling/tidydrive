@@ -148,6 +148,9 @@ public enum CleanupAction: Codable, Hashable, Sendable {
     case commands([Command], fallbackDelete: [String])
     /// Re-encode a video to MP4 or a photo to HEIC, then trash the original.
     case convert(MediaConversion)
+    /// Nothing TidyDrive should delete itself: the app has its own way
+    /// (WhatsApp storage manager, Docker Desktop). `open` is a bundle id or URL.
+    case manual(instructions: String, open: String?)
 
     public var summary: String {
         switch self {
@@ -155,6 +158,7 @@ public enum CleanupAction: Codable, Hashable, Sendable {
         case .trash: return "Move to Trash"
         case .commands(let commands, _): return commands.map(\.display).joined(separator: " && ")
         case .convert(let c): return c.kind == .video ? "Convert to H.265 MP4, original to the Trash" : "Convert to HEIC, original to the Trash"
+        case .manual(let instructions, _): return instructions
         }
     }
 }
@@ -175,10 +179,15 @@ public struct CleanupItem: Codable, Hashable, Sendable, Identifiable {
     /// The project folder this item belongs to, for projects and large
     /// files. Lets the user keep a whole project out of future scans.
     public var project: String?
+    /// App that must not be running while this is cleaned: a bundle id
+    /// ("com.docker.docker") or an app name ("Slack").
+    public var quitApp: String?
+
+    public var isManual: Bool { if case .manual = action { return true } else { return false } }
 
     public init(id: String, category: Category, group: String, title: String, detail: String,
                 path: String?, size: Int64, risk: Risk, selectedByDefault: Bool, action: CleanupAction,
-                project: String? = nil) {
+                project: String? = nil, quitApp: String? = nil) {
         self.id = id
         self.category = category
         self.group = group
@@ -191,6 +200,7 @@ public struct CleanupItem: Codable, Hashable, Sendable, Identifiable {
         self.selectedByDefault = risk == .careful ? false : selectedByDefault
         self.action = action
         self.project = project
+        self.quitApp = quitApp
     }
 }
 

@@ -77,7 +77,7 @@ public final class ScanEngine: Sendable {
     public static var allScanners: [any Scanner] {
         [XcodeScanner(), SimulatorScanner(), ProjectScanner(), CacheScanner(), ModelScanner(),
          ToolchainScanner(), DockerScanner(), AndroidScanner(), VideoScanner(), PhotoScanner(), DuplicateScanner(),
-         WorktreeScanner()]
+         WorktreeScanner(), AppScanner(), AppDataScanner()]
     }
 
     /// Runs every enabled scanner in parallel. `progress` is called with the
