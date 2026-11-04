@@ -11,14 +11,24 @@ public struct ScanSettings: Codable, Equatable, Sendable {
     public var categories: Set<Category>
     /// Project folders the user keeps: nothing inside them is offered.
     public var keptProjects: [String]
+    /// Where videos and photos are looked for.
+    public var mediaFolders: [String]
+    public var videoQuality: VideoQuality
+    /// Videos below this size are not worth converting.
+    public var minVideoBytes: Int64 = 100_000_000
+    /// Photos below this size are not worth converting.
+    public var minPhotoBytes: Int64 = 2_000_000
 
     public init(projectRoots: [String], staleDays: Int = 60, largeFileBytes: Int64 = 500 * 1_000_000,
-                categories: Set<Category> = Set(Category.allCases), keptProjects: [String] = []) {
+                categories: Set<Category> = Set(Category.allCases), keptProjects: [String] = [],
+                mediaFolders: [String] = [], videoQuality: VideoQuality = .balanced) {
         self.projectRoots = projectRoots
         self.staleDays = staleDays
         self.largeFileBytes = largeFileBytes
         self.categories = categories
         self.keptProjects = keptProjects
+        self.mediaFolders = mediaFolders
+        self.videoQuality = videoQuality
     }
 
     /// The first of the usual project folders that exists.
@@ -66,7 +76,7 @@ public final class ScanEngine: Sendable {
 
     public static var allScanners: [any Scanner] {
         [XcodeScanner(), SimulatorScanner(), ProjectScanner(), CacheScanner(), ModelScanner(),
-         ToolchainScanner(), DockerScanner(), AndroidScanner()]
+         ToolchainScanner(), DockerScanner(), AndroidScanner(), VideoScanner(), PhotoScanner(), DuplicateScanner()]
     }
 
     /// Runs every enabled scanner in parallel. `progress` is called with the

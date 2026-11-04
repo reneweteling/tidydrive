@@ -31,6 +31,9 @@ Website: https://reneweteling.github.io/tidydrive/
 | Language versions | Versions no project asks for, across asdf, mise, nvm, fnm, Volta, nodenv, rbenv, rvm, pyenv, uv, rustup, goenv, SDKMAN, fvm, tfenv, plus duplicate installs and old Homebrew formulas | the version manager's uninstall |
 | Docker | Images and volumes per compose project, dangling images, stopped containers, build cache | `docker rmi`, `docker volume rm`, `docker builder prune` |
 | Android | AVDs, SDK cache, old build-tools, system images | delete |
+| Videos to shrink | Large videos in Movies, Desktop, Downloads, Documents and Pictures, re-encoded to H.265 MP4 on the media engine with the same resolution, frame rate and audio. You approve the quality on a test file first | MP4 saved next to it, original to the Trash |
+| Photos to shrink | Large PNG, TIFF and JPEG files, re-encoded to HEIC with the same resolution and metadata | HEIC saved next to it, original to the Trash |
+| Duplicate photos | Exact copies, plus resized and near copies found with Apple Vision; the copy with the most pixels stays | Trash |
 
 ## How it decides
 
@@ -41,6 +44,8 @@ Website: https://reneweteling.github.io/tidydrive/
 | A project is stale after 60 days without a commit, never with uncommitted changes | Stale build output is preselected, active projects are not |
 | A language version stays when a `.tool-versions`, `.nvmrc`, `mise.toml`, `rust-toolchain.toml`... points at it, and the newest per manager always stays | Removing a version a project needs breaks that project |
 | Docker skips anything a running container uses | |
+| Media inside a git repository, the Photos library and app libraries is never touched | Website assets and test fixtures are source; libraries break when files change underneath them |
+| A video or photo is only converted after you approved the quality on a test file, and the original only goes to the Trash once the new file plays, has the same duration and resolution, and is smaller | |
 | Careful items are never preselected | Volumes, models, large files and language versions may be data that does not come back |
 | Every delete passes a guard that refuses the home folder, personal folders, project roots and anything outside your home | A bug in a rule cannot reach your documents |
 

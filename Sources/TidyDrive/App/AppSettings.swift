@@ -16,6 +16,17 @@ final class AppSettings: ObservableObject {
     @Published var crashReports: Bool { didSet { defaults.set(crashReports, forKey: "crashReports") } }
     /// Projects the user is working on: never offered for cleaning.
     @Published var keptProjects: [String] { didSet { defaults.set(keptProjects, forKey: "keptProjects") } }
+    /// Empty means the defaults: Movies, Desktop, Downloads, Documents,
+    /// Pictures and the project folders.
+    @Published var mediaFolders: [String] { didSet { defaults.set(mediaFolders, forKey: "mediaFolders") } }
+    @Published var videoQuality: VideoQuality {
+        didSet { defaults.set(videoQuality.rawValue, forKey: "videoQuality") }
+    }
+    /// The video quality the user looked at and approved; nil until then.
+    @Published var approvedVideoQuality: VideoQuality? {
+        didSet { defaults.set(approvedVideoQuality?.rawValue, forKey: "approvedVideoQuality") }
+    }
+    @Published var approvedPhotos: Bool { didSet { defaults.set(approvedPhotos, forKey: "approvedPhotos") } }
     @Published var disabledCategories: Set<String> {
         didSet { defaults.set(Array(disabledCategories), forKey: "disabledCategories") }
     }
@@ -33,6 +44,10 @@ final class AppSettings: ObservableObject {
         crashReports = defaults.bool(forKey: "crashReports")
         disabledCategories = Set(defaults.stringArray(forKey: "disabledCategories") ?? [])
         keptProjects = defaults.stringArray(forKey: "keptProjects") ?? []
+        mediaFolders = defaults.stringArray(forKey: "mediaFolders") ?? []
+        videoQuality = VideoQuality(rawValue: defaults.string(forKey: "videoQuality") ?? "") ?? .balanced
+        approvedVideoQuality = VideoQuality(rawValue: defaults.string(forKey: "approvedVideoQuality") ?? "")
+        approvedPhotos = defaults.bool(forKey: "approvedPhotos")
     }
 
     var threshold: Double { Double(thresholdPercent) / 100 }
@@ -43,7 +58,9 @@ final class AppSettings: ObservableObject {
             staleDays: staleDays,
             largeFileBytes: Int64(largeFileMB) * 1_000_000,
             categories: Set(Category.allCases.filter { !disabledCategories.contains($0.rawValue) }),
-            keptProjects: keptProjects
+            keptProjects: keptProjects,
+            mediaFolders: mediaFolders,
+            videoQuality: videoQuality
         )
     }
 
@@ -63,6 +80,18 @@ final class AppSettings: ObservableObject {
 
     func release(_ project: String) {
         keptProjects.removeAll { $0 == project || $0 == displayPath(project) }
+    }
+
+    func isApproved(_ kind: MediaConversion.Kind) -> Bool {
+        kind == .video ? approvedVideoQuality == videoQuality : approvedPhotos
+    }
+
+    func approve(_ kind: MediaConversion.Kind) {
+        if kind == .video { approvedVideoQuality = videoQuality } else { approvedPhotos = true }
+    }
+
+    var effectiveMediaFolders: [String] {
+        mediaFolders.isEmpty ? ["~/Movies", "~/Desktop", "~/Downloads", "~/Documents", "~/Pictures"] + projectRoots : mediaFolders
     }
 
     func isEnabled(_ category: Category) -> Bool { !disabledCategories.contains(category.rawValue) }

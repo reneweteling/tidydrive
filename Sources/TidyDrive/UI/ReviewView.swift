@@ -18,6 +18,7 @@ struct ReviewView: View {
                 } else {
                     emptyState
                 }
+                TrashedOriginalsBanner(model: model).padding(.horizontal, 16).padding(.top, 8)
                 Divider()
                 footer
             }
@@ -130,6 +131,8 @@ struct ReviewView: View {
 struct CategoryDetail: View {
     @ObservedObject var model: AppModel
     let category: Category
+    @State private var testing: MediaConversion.Kind?
+    @State private var testItem: CleanupItem?
 
     var body: some View {
         let items = model.items(in: category)
@@ -143,8 +146,12 @@ struct CategoryDetail: View {
                 Text(ByteFormat.string(model.result?.size(of: category) ?? 0))
                     .font(.system(size: 15)).foregroundStyle(.secondary).monospacedDigit()
                 Spacer()
-                Button("Select safe") {
-                    model.selection.formUnion(items.filter { $0.risk == .safe }.map(\.id))
+                if category.isConversion || category == .duplicates {
+                    Button("Select all") { model.selection.formUnion(items.map(\.id)) }
+                } else {
+                    Button("Select safe") {
+                        model.selection.formUnion(items.filter { $0.risk == .safe }.map(\.id))
+                    }
                 }
                 Button("Select none") { model.selection.subtract(items.map(\.id)) }
             }
@@ -158,6 +165,9 @@ struct CategoryDetail: View {
                     .padding(.horizontal, 20).padding(.bottom, 8)
             }
 
+            if category.isConversion {
+                MediaPanel(model: model, category: category, testing: $testing)
+            }
             if category == .projects {
                 ProjectTree(model: model, items: items)
             } else {
@@ -165,7 +175,7 @@ struct CategoryDetail: View {
                 ForEach(groups, id: \.name) { group in
                     Section {
                         ForEach(group.items) { item in
-                            ItemRow(model: model, item: item)
+                            ItemRow(model: model, item: item, onTest: category.isConversion ? { testItem = $0 } : nil)
                         }
                     } header: {
                         HStack(spacing: 8) {
@@ -180,6 +190,17 @@ struct CategoryDetail: View {
             }
             .listStyle(.inset)
             }
+        }
+        .onChange(of: testing) { _, kind in
+            guard kind != nil else { return }
+            // Test on the largest selected file, or the largest one when
+            // nothing is selected yet: the hardest case for the encoder.
+            let items = model.items(in: category)
+            testItem = items.filter { model.selection.contains($0.id) }.max { $0.size < $1.size } ?? items.max { $0.size < $1.size }
+            testing = nil
+        }
+        .sheet(item: $testItem) { item in
+            MediaTestSheet(model: model, kind: category == .videos ? .video : .photo, item: item)
         }
     }
 }
@@ -291,6 +312,7 @@ struct ItemRow: View {
     let item: CleanupItem
     var titleOverride: String? = nil
     var showPin = true
+    var onTest: ((CleanupItem) -> Void)? = nil
 
     var body: some View {
         HStack(spacing: 10) {
@@ -323,6 +345,9 @@ struct ItemRow: View {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(path, forType: .string)
                 }
+            }
+            if let onTest {
+                Button("Test the quality on this one") { onTest(item) }
             }
             if let project = item.project {
                 Divider()
@@ -371,11 +396,25 @@ struct ConfirmSheet: View {
                     .frame(maxHeight: 120)
                 }
             }
+            let conversions = items.filter { $0.category.isConversion }.count
+            if conversions > 0 {
+                Text("\(conversions) file\(conversions == 1 ? " is" : "s are") converted. Each new file is saved next to the original under the same name, and the original goes to the Trash.")
+                    .font(.system(size: 12)).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             Text(trash.isEmpty
                  ? "Everything selected is deleted right away. Caches and dependencies come back when your tools need them."
                  : "\(trash.count) item\(trash.count == 1 ? " goes" : "s go") to the Trash. Everything else is deleted right away.")
                 .font(.system(size: 12)).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+            let unapproved = model.unapprovedConversions
+            if !unapproved.isEmpty {
+                Label("Test the quality first: open \(unapproved.map { $0 == .video ? "Videos to shrink" : "Photos to shrink" }.joined(separator: " and ")) and click Test on one. Or deselect those items.",
+                      systemImage: "eye")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Theme.riskColor(.careful))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             HStack {
                 Spacer()
                 Button("Cancel") { isPresented = false }.keyboardShortcut(.cancelAction)
@@ -385,6 +424,7 @@ struct ConfirmSheet: View {
                 }
                 .buttonStyle(.borderedProminent).tint(Theme.accent)
                 .keyboardShortcut(.defaultAction)
+                .disabled(!unapproved.isEmpty)
             }
         }
         .padding(22)

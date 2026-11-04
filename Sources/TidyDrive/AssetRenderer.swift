@@ -41,6 +41,9 @@ enum AssetRenderer {
             model.focusedCategory = .projects
             snapshot(ReviewView(model: model), size: NSSize(width: 980, height: 620), appearance: .darkAqua,
                      to: dir.appendingPathComponent("tree.png"))
+            model.focusedCategory = .videos
+            snapshot(ReviewView(model: model), size: NSSize(width: 980, height: 620), appearance: .darkAqua,
+                     to: dir.appendingPathComponent("videos.png"))
             snapshot(AboutView(updates: UpdateChecker.shared), size: NSSize(width: 540, height: 640), appearance: .darkAqua,
                      to: dir.appendingPathComponent("about.png"))
             snapshot(SettingsView(settings: settings, updates: UpdateChecker.shared), size: NSSize(width: 540, height: 520),
@@ -191,7 +194,20 @@ enum Sample {
         item(.docker, "Project acme-shop", "acme-shop_mysql", "Only stopped containers use this volume. It may hold a database or uploads, which do not come back.", 410 * MB, .careful, false),
         item(.docker, "General", "Stopped containers", "41 containers. docker compose up creates them again. Their volumes stay.", 330 * MB, .rebuild, true),
         item(.android, "SDK", "System image android-34 google_apis", "Emulator image, downloaded again by the SDK manager", 4_600 * MB, .rebuild, false),
+        media(.video, "~/Movies", "Product demo 4K.mov", "4K 60fps · 8:12 · 6.2 GB → about 1.4 GB MP4", 6_200 * MB, 1_400 * MB),
+        media(.video, "~/Desktop", "Screen Recording 2026-10-28.mov", "1440p 60fps · 14:03 · 3.9 GB → about 610 MB MP4", 3_900 * MB, 610 * MB),
+        media(.video, "~/Movies/Conference", "talk-recording.mov", "1080p 30fps · 42:10 · 5.1 GB → about 1.2 GB MP4", 5_100 * MB, 1_200 * MB),
+        media(.photo, "~/Pictures/Exports", "hero-banner.tiff", "TIFF 7200×4800 · 198 MB → about 16 MB HEIC", 198 * MB, 16 * MB),
+        media(.photo, "~/Desktop", "Screenshot 2026-10-30 at 09.12.44.png", "PNG 5120×2880 · 14 MB → about 2 MB HEIC", 14 * MB, 2 * MB),
+        item(.duplicates, "Same as ~/Pictures/Holiday/IMG_2041.jpg", "~/Downloads/IMG_2041.jpg", "Exact copy · the copy with the most pixels stays · goes to the Trash", 6 * MB, .careful, false),
+        item(.duplicates, "Same as ~/Pictures/Holiday/IMG_2041.jpg", "~/Desktop/IMG_2041-small.jpg", "Looks the same, smaller version · the copy with the most pixels stays · goes to the Trash", 2 * MB, .careful, false),
     ]
+
+    static func media(_ kind: MediaConversion.Kind, _ folder: String, _ name: String, _ detail: String, _ size: Int64, _ estimate: Int64) -> CleanupItem {
+        CleanupItem(id: "\(kind.rawValue):\(name)", category: kind == .video ? .videos : .photos, group: folder, title: name,
+                    detail: detail, path: nil, size: size - estimate, risk: .careful, selectedByDefault: false,
+                    action: .convert(MediaConversion(kind: kind, source: "/tmp/\(name)", originalSize: size, estimatedSize: estimate)))
+    }
 
     static var result: ScanResult {
         ScanResult(items: items.sorted { $0.size > $1.size },

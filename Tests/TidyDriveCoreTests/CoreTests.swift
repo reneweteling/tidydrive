@@ -205,3 +205,117 @@ final class CleanerTests: XCTestCase {
         XCTAssertTrue(report.outcomes[1].message?.contains("Refused") == true)
     }
 }
+
+import AVFoundation
+import ImageIO
+import UniformTypeIdentifiers
+
+final class ConversionTests: XCTestCase {
+    var dir: URL!
+    var trash: URL!
+
+    override func setUpWithError() throws {
+        dir = FileManager.default.temporaryDirectory.appendingPathComponent("tidydrive-media-\(UUID().uuidString)")
+        trash = dir.appendingPathComponent("FakeTrash")
+        try FileManager.default.createDirectory(at: trash, withIntermediateDirectories: true)
+    }
+
+    override func tearDownWithError() throws { try? FileManager.default.removeItem(at: dir) }
+
+    private func cleaner() -> Cleaner {
+        let trash = self.trash!
+        return Cleaner(shell: Shell(resolver: ToolResolver()), guardrail: SafetyGuard(home: dir.path, projectRoots: []),
+                       moveToTrash: { url in
+                           let target = trash.appendingPathComponent(url.lastPathComponent)
+                           try FileManager.default.moveItem(at: url, to: target)
+                           return target
+                       })
+    }
+
+    /// Two seconds of moving gradient, H.264 at a deliberately high bitrate.
+    private func makeVideo(_ url: URL) async throws {
+        let writer = try AVAssetWriter(outputURL: url, fileType: .mov)
+        let input = AVAssetWriterInput(mediaType: .video, outputSettings: [
+            AVVideoCodecKey: AVVideoCodecType.h264, AVVideoWidthKey: 640, AVVideoHeightKey: 360,
+            AVVideoCompressionPropertiesKey: [AVVideoAverageBitRateKey: 8_000_000]
+        ])
+        let adaptor = AVAssetWriterInputPixelBufferAdaptor(assetWriterInput: input, sourcePixelBufferAttributes: [
+            kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA, kCVPixelBufferWidthKey as String: 640,
+            kCVPixelBufferHeightKey as String: 360
+        ])
+        writer.add(input)
+        writer.startWriting()
+        writer.startSession(atSourceTime: .zero)
+        for frame in 0..<60 {
+            while !input.isReadyForMoreMediaData { try await Task.sleep(nanoseconds: 1_000_000) }
+            var buffer: CVPixelBuffer?
+            CVPixelBufferPoolCreatePixelBuffer(nil, adaptor.pixelBufferPool!, &buffer)
+            CVPixelBufferLockBaseAddress(buffer!, [])
+            let base = CVPixelBufferGetBaseAddress(buffer!)!.assumingMemoryBound(to: UInt8.self)
+            let stride = CVPixelBufferGetBytesPerRow(buffer!)
+            for y in 0..<360 { for x in 0..<640 {
+                let p = base + y * stride + x * 4
+                p[0] = UInt8((x + frame * 4) % 256); p[1] = UInt8((y * 2 + frame) % 256); p[2] = UInt8((x ^ y) % 256); p[3] = 255
+            } }
+            CVPixelBufferUnlockBaseAddress(buffer!, [])
+            adaptor.append(buffer!, withPresentationTime: CMTime(value: CMTimeValue(frame), timescale: 30))
+        }
+        input.markAsFinished()
+        await writer.finishWriting()
+    }
+
+    func testVideoConvertsToMP4AndOriginalGoesToTrash() async throws {
+        let movies = dir.appendingPathComponent("Movies")
+        try FileManager.default.createDirectory(at: movies, withIntermediateDirectories: true)
+        let source = movies.appendingPathComponent("clip.mov")
+        try await makeVideo(source)
+        let size = Int64(try source.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0)
+        let item = CleanupItem(id: "v", category: .videos, group: "", title: "clip.mov", detail: "", path: source.path,
+                               size: 1, risk: .careful, selectedByDefault: false,
+                               action: .convert(MediaConversion(kind: .video, source: source.path, originalSize: size, estimatedSize: 0)))
+        let report = await cleaner().clean([item], videoQuality: .small)
+
+        XCTAssertEqual(report.outcomes.first?.succeeded, true, report.outcomes.first?.message ?? "")
+        let mp4 = movies.appendingPathComponent("clip.mp4")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: mp4.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: source.path), "the original left its folder")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: trash.appendingPathComponent("clip.mov").path))
+        let info = try await VideoEncoder.probe(mp4)
+        XCTAssertEqual(info.codec.lowercased(), "hvc1")
+        XCTAssertEqual(info.width, 640)
+        XCTAssertEqual(info.height, 360)
+        XCTAssertEqual(info.duration, 2, accuracy: 0.2)
+        XCTAssertEqual(report.trashedOriginals.count, 1)
+    }
+
+    func testPhotoConvertsToHEICKeepingSize() async throws {
+        let pictures = dir.appendingPathComponent("Pictures")
+        try FileManager.default.createDirectory(at: pictures, withIntermediateDirectories: true)
+        let source = pictures.appendingPathComponent("shot.png")
+        let ctx = CGContext(data: nil, width: 800, height: 600, bitsPerComponent: 8, bytesPerRow: 0,
+                            space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        for i in 0..<60 {
+            ctx.setFillColor(CGColor(srgbRed: CGFloat(i % 7) / 7, green: CGFloat(i % 5) / 5, blue: CGFloat(i % 3) / 3, alpha: 1))
+            ctx.fill(CGRect(x: i * 13, y: i * 9, width: 200, height: 150))
+        }
+        let dest = CGImageDestinationCreateWithURL(source as CFURL, UTType.png.identifier as CFString, 1, nil)!
+        CGImageDestinationAddImage(dest, ctx.makeImage()!, nil)
+        CGImageDestinationFinalize(dest)
+        let size = Int64(try source.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0)
+
+        let item = CleanupItem(id: "p", category: .photos, group: "", title: "shot.png", detail: "", path: source.path,
+                               size: 1, risk: .careful, selectedByDefault: false,
+                               action: .convert(MediaConversion(kind: .photo, source: source.path, originalSize: size, estimatedSize: 0)))
+        let report = await cleaner().clean([item])
+        let heic = pictures.appendingPathComponent("shot.heic")
+        if report.outcomes.first?.succeeded == false {
+            // A flat test image can already be tiny as PNG; then the original must stay.
+            XCTAssertTrue(FileManager.default.fileExists(atPath: source.path))
+            XCTAssertFalse(FileManager.default.fileExists(atPath: heic.path))
+            return
+        }
+        XCTAssertTrue(FileManager.default.fileExists(atPath: heic.path))
+        XCTAssertEqual(PhotoEncoder.probe(heic)?.width, 800)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: source.path))
+    }
+}

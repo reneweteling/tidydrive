@@ -17,6 +17,9 @@ final class AppModel: ObservableObject {
     @Published private(set) var phase: Phase = .idle
     @Published private(set) var lastReport: CleanupReport?
     @Published var selection: Set<String> = []
+    /// Originals of converted videos and photos, waiting in the Trash.
+    @Published private(set) var trashedOriginals: [String] = []
+    @Published private(set) var trashedOriginalsBytes: Int64 = 0
 
     /// Set when the user picked a category in the popover, so the review
     /// window opens on it.
@@ -182,9 +185,18 @@ final class AppModel: ObservableObject {
 
         let guardrail = SafetyGuard(home: home, projectRoots: settings.projectRoots.map { expandHome($0) })
         let cleaner = Cleaner(shell: Shell(resolver: resolver), guardrail: guardrail)
-        let report = await cleaner.clean(items) { item, done, total in
+        let current = CurrentItem()
+        let report = await cleaner.clean(items, progress: { item, done, total in
+            current.set(item.title, done, total)
             Task { @MainActor in self.phase = .cleaning(done: done, total: total, current: item.title) }
-        }
+        }, conversionProgress: { fraction in
+            let (title, done, total) = current.get()
+            Task { @MainActor in
+                self.phase = .cleaning(done: done, total: total, current: "\(title), \(Int(fraction * 100))%")
+            }
+        }, videoQuality: settings.videoQuality)
+        trashedOriginals += report.trashedOriginals
+        trashedOriginalsBytes += report.trashedBytes
         lastReport = report
         phase = .idle
         Telemetry.breadcrumb("clean.finished", data: ["freedMB": report.freed / 1_000_000, "failed": report.failed.count])
@@ -205,6 +217,27 @@ final class AppModel: ObservableObject {
     }
 
     func dismissReport() { lastReport = nil }
+
+    /// Deletes only the originals TidyDrive moved to the Trash, nothing else
+    /// that is in there.
+    func deleteTrashedOriginals() async {
+        let paths = trashedOriginals
+        _ = await Task.detached { Cleaner.deleteFromTrash(paths, home: FileManager.default.homeDirectoryForCurrentUser.path) }.value
+        trashedOriginals = []
+        trashedOriginalsBytes = 0
+        disk = FileSystem.diskStatus()
+        Telemetry.breadcrumb("originals.deleted", data: ["count": paths.count])
+    }
+
+    /// Kinds of conversion in the selection whose quality the user has not
+    /// approved yet. Cleaning waits until this is empty.
+    var unapprovedConversions: [MediaConversion.Kind] {
+        var kinds: [MediaConversion.Kind] = []
+        let selected = selectedItems
+        if selected.contains(where: { $0.category == .videos }), !settings.isApproved(.video) { kinds.append(.video) }
+        if selected.contains(where: { $0.category == .photos }), !settings.isApproved(.photo) { kinds.append(.photo) }
+        return kinds
+    }
 
     private func expandHome(_ path: String) -> String {
         path.hasPrefix("~") ? home + path.dropFirst() : path
@@ -243,11 +276,19 @@ final class AppModel: ObservableObject {
     }
 }
 
+private final class CurrentItem: @unchecked Sendable {
+    private var value: (String, Int, Int) = ("", 0, 0)
+    private let lock = NSLock()
+    func set(_ title: String, _ done: Int, _ total: Int) { lock.lock(); value = (title, done, total); lock.unlock() }
+    func get() -> (String, Int, Int) { lock.lock(); defer { lock.unlock() }; return value }
+}
+
 extension CleanupAction {
     var kind: String {
         switch self {
         case .delete: return "delete"
         case .trash: return "trash"
+        case .convert(let c): return "convert-\(c.kind.rawValue)"
         case .commands(let commands, _): return commands.first?.executable ?? "command"
         }
     }

@@ -46,8 +46,14 @@ public enum Category: String, Codable, CaseIterable, Sendable, Identifiable {
     case toolchains
     case docker
     case android
+    case videos
+    case photos
+    case duplicates
 
     public var id: String { rawValue }
+
+    /// Categories that shrink files instead of deleting them.
+    public var isConversion: Bool { self == .videos || self == .photos }
 
     public var title: String {
         switch self {
@@ -60,6 +66,9 @@ public enum Category: String, Codable, CaseIterable, Sendable, Identifiable {
         case .toolchains: return "Language versions"
         case .docker: return "Docker"
         case .android: return "Android"
+        case .videos: return "Videos to shrink"
+        case .photos: return "Photos to shrink"
+        case .duplicates: return "Duplicate photos"
         }
     }
 
@@ -75,6 +84,9 @@ public enum Category: String, Codable, CaseIterable, Sendable, Identifiable {
         case .toolchains: return "chevron.left.forwardslash.chevron.right"
         case .docker: return "cube.transparent"
         case .android: return "apps.iphone"
+        case .videos: return "film"
+        case .photos: return "photo"
+        case .duplicates: return "square.on.square"
         }
     }
 }
@@ -97,6 +109,26 @@ public struct Command: Codable, Hashable, Sendable {
     }
 }
 
+/// A file to re-encode in place: the new file lands next to the original,
+/// which goes to the Trash once the new one checks out.
+public struct MediaConversion: Codable, Hashable, Sendable {
+    public enum Kind: String, Codable, Sendable { case video, photo }
+    public var kind: Kind
+    public var source: String
+    public var originalSize: Int64
+    public var estimatedSize: Int64
+
+    public init(kind: Kind, source: String, originalSize: Int64, estimatedSize: Int64) {
+        self.kind = kind
+        self.source = source
+        self.originalSize = originalSize
+        self.estimatedSize = estimatedSize
+    }
+
+    /// x.mov -> x.mp4, IMG.png -> IMG.heic
+    public var targetExtension: String { kind == .video ? "mp4" : "heic" }
+}
+
 public enum CleanupAction: Codable, Hashable, Sendable {
     /// Remove the paths right away. For things that regenerate.
     case delete([String])
@@ -105,12 +137,15 @@ public enum CleanupAction: Codable, Hashable, Sendable {
     /// Run the tool's own clean command(s) in order. When a command is not
     /// installed, `fallbackDelete` paths are removed instead.
     case commands([Command], fallbackDelete: [String])
+    /// Re-encode a video to MP4 or a photo to HEIC, then trash the original.
+    case convert(MediaConversion)
 
     public var summary: String {
         switch self {
         case .delete(let paths): return paths.count == 1 ? "Delete" : "Delete \(paths.count) folders"
         case .trash: return "Move to Trash"
         case .commands(let commands, _): return commands.map(\.display).joined(separator: " && ")
+        case .convert(let c): return c.kind == .video ? "Convert to H.265 MP4, original to the Trash" : "Convert to HEIC, original to the Trash"
         }
     }
 }

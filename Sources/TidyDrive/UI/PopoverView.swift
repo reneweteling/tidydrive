@@ -16,6 +16,7 @@ struct PopoverView: View {
             }
             statusBanner
             categories
+            TrashedOriginalsBanner(model: model)
             actions
             Divider()
             footer
@@ -113,7 +114,8 @@ struct PopoverView: View {
                 .controlSize(.large)
                 .buttonStyle(.borderedProminent)
                 .tint(Theme.accent)
-                .disabled(model.phase != .idle || model.selectedSize == 0)
+                .disabled(model.phase != .idle || model.selectedSize == 0 || !model.unapprovedConversions.isEmpty)
+                .help(model.unapprovedConversions.isEmpty ? "" : "Test the video or photo quality first, in Review")
             }
         }
         .overlay(alignment: .top) {

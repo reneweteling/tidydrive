@@ -31,42 +31,53 @@ public struct ToolchainScanner: Scanner {
         }
         let managersPerLanguage = Dictionary(grouping: installs, by: \.language).mapValues { Set($0.map(\.manager)) }
 
-        var candidates: [(Install, String)] = []
+        // Every installed version is listed, so you see what is on disk. Only
+        // the ones nothing needs are worded as candidates; none is preselected.
+        var listed: [(Install, String, String)] = []  // install, status, detail
         for install in installs {
-            if usage.isUsed(language: install.language, version: install.version) { continue }
-
+            let lang = Self.displayName(install.language)
             let managers = managersPerLanguage[install.language] ?? []
             let shellUses = active[install.language]
             // Only a duplicate when the shell demonstrably uses one of the
             // other managers that has this language installed.
             let duplicate = managers.count > 1 && shellUses != nil && shellUses != install.manager
                 && managers.contains(shellUses!)
-            if !duplicate {
-                if keep.contains(install.path) { continue }
-                if install.manager == "rustup", Self.isDefaultRustup(install, context: context) { continue }
-                if install.manager == "sdkman", Self.isSdkmanCurrent(install) { continue }
-            }
+            let used = usage.isUsed(language: install.language, version: install.version)
+            let isDefault = (install.manager == "rustup" && Self.isDefaultRustup(install, context: context))
+                || (install.manager == "sdkman" && Self.isSdkmanCurrent(install))
 
-            var detail = "\(install.manager)"
+            let status: String
+            var detail = install.manager
             if duplicate, let shellUses {
-                detail += " · your shell uses \(shellUses) for \(Self.displayName(install.language)), not this one"
+                status = "unused duplicate"
+                detail += " · your shell uses \(shellUses) for \(lang), not this one"
+            } else if used {
+                status = "in use"
+                detail += " · a version file in your projects or your global config asks for it"
+            } else if isDefault {
+                status = "default"
+                detail += " · the default toolchain"
+            } else if keep.contains(install.path) {
+                status = "newest"
+                detail += " · the newest \(lang) in \(install.manager), kept as fallback"
             } else {
+                status = "not used"
                 let projects = usage.projectCount[VersionUsage.normalizeLanguage(install.language)] ?? 0
-                detail += projects > 0 ? " · none of your \(projects) \(Self.displayName(install.language)) projects ask for it"
-                                       : " · no project asks for it"
+                detail += projects > 0 ? " · none of your \(projects) \(lang) projects ask for it" : " · no project asks for it"
             }
-            candidates.append((install, detail))
+            listed.append((install, status, detail))
         }
 
-        let sizes = Sizer.sizes(candidates.map(\.0.path))
-        var items = candidates.map { install, detail in
+        let sizes = Sizer.sizes(listed.map(\.0.path))
+        var items = listed.map { install, status, detail in
             CleanupItem(
                 id: "toolchain:\(install.path)", category: .toolchains, group: Self.displayName(install.language),
-                title: "\(Self.displayName(install.language)) \(install.version)", detail: detail, path: install.path,
+                title: "\(Self.displayName(install.language)) \(install.version) · \(status)", detail: detail, path: install.path,
                 size: sizes[install.path] ?? 0, risk: .careful, selectedByDefault: false,
                 action: install.uninstall.map { .commands([$0], fallbackDelete: [install.path]) } ?? .delete([install.path])
             )
         }
+        items += corepackVersions(context)
         items += homebrewDuplicates(context)
         return (items, [])
     }
@@ -207,6 +218,34 @@ public struct ToolchainScanner: Scanner {
         let current = ((install.path as NSString).deletingLastPathComponent as NSString).appendingPathComponent("current")
         guard let target = try? FileManager.default.destinationOfSymbolicLink(atPath: current) else { return false }
         return (target as NSString).lastPathComponent == (install.path as NSString).lastPathComponent
+    }
+
+    // MARK: - Package manager versions
+
+    /// Corepack keeps every pnpm, Yarn and npm version a project ever asked
+    /// for. The newest of each stays; older ones download again on demand.
+    private func corepackVersions(_ context: ScanContext) -> [CleanupItem] {
+        var items: [CleanupItem] = []
+        for base in [".cache/node/corepack/v1", ".cache/node/corepack"].map(context.path) {
+            for manager in ["pnpm", "yarn", "npm"] {
+                let dir = "\(base)/\(manager)"
+                let versions = FileSystem.subdirectories(of: dir).filter { $0.first?.isNumber == true }
+                    .sorted { Self.compareVersions($0, $1) == .orderedDescending }
+                guard !versions.isEmpty else { continue }
+                let sizes = Sizer.sizes(versions.map { "\(dir)/\($0)" })
+                for (index, version) in versions.enumerated() {
+                    let path = "\(dir)/\(version)"
+                    let newest = index == 0
+                    items.append(CleanupItem(
+                        id: "corepack:\(path)", category: .toolchains, group: "Package managers",
+                        title: "\(manager) \(version) · \(newest ? "newest" : "older")",
+                        detail: "Corepack · " + (newest ? "the newest \(manager) Corepack has" : "downloaded again if a project asks for it"),
+                        path: path, size: sizes[path] ?? 0, risk: .rebuild, selectedByDefault: !newest, action: .delete([path])
+                    ))
+                }
+            }
+        }
+        return items
     }
 
     // MARK: - Homebrew

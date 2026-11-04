@@ -10,6 +10,7 @@ struct SettingsView: View {
         TabView {
             general.tabItem { Label("General", systemImage: "gearshape") }
             projects.tabItem { Label("Projects", systemImage: "folder") }
+            media.tabItem { Label("Media", systemImage: "film") }
             categories.tabItem { Label("Categories", systemImage: "square.grid.2x2") }
             about.tabItem { Label("About", systemImage: "info.circle") }
         }
@@ -92,6 +93,60 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
+    }
+
+    private var media: some View {
+        Form {
+            Section {
+                ForEach(settings.effectiveMediaFolders, id: \.self) { folder in
+                    HStack {
+                        Image(systemName: "folder")
+                        Text(folder).font(.system(.body, design: .monospaced))
+                        Spacer()
+                        Button {
+                            var list = settings.effectiveMediaFolders
+                            list.removeAll { $0 == folder }
+                            settings.mediaFolders = list
+                        } label: { Image(systemName: "minus.circle") }
+                        .buttonStyle(.plain)
+                    }
+                }
+                HStack {
+                    Button("Add Folder…", action: addMediaFolder)
+                    if !settings.mediaFolders.isEmpty {
+                        Button("Reset to defaults") { settings.mediaFolders = [] }
+                    }
+                }
+            } header: {
+                Text("Look for videos and photos in")
+            } footer: {
+                Text("The Photos library, app libraries and anything inside a git repository are always left alone.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            Section("Video") {
+                Picker("Quality", selection: $settings.videoQuality) {
+                    ForEach(VideoQuality.allCases) { Text($0.label).tag($0) }
+                }
+                Text("H.265 in an MP4, encoded on the Apple Silicon media engine. Same resolution, frame rate, orientation and audio. A new quality needs a new test before converting.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        .formStyle(.grouped)
+    }
+
+    private func addMediaFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = true
+        panel.prompt = "Add"
+        guard panel.runModal() == .OK else { return }
+        var list = settings.effectiveMediaFolders
+        for url in panel.urls {
+            let path = settings.displayPath(url.path)
+            if !list.contains(path) { list.append(path) }
+        }
+        settings.mediaFolders = list
     }
 
     private var categories: some View {
